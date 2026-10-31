@@ -1,0 +1,62 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #172033;
+  background: #eef1f7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100vh;
+  padding: 1rem;
+  gap: 1rem;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+h1 {
+  margin: 0 1rem 0 0;
+}
+
+input,
+button {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #c7ccda;
+  border-radius: 0.4rem;
+  background: #ffffff;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+#status {
+  font-weight: 600;
+}
+
+#board {
+  width: 100%;
+  min-height: 0;
+  border: 2px solid #c7ccda;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  touch-action: none;
+}

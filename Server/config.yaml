@@ -1,0 +1,11 @@
+server:
+  host: "0.0.0.0"
+  port: 3005
+
+clients:
+  - name: "Laptop-1"
+    ip: "192.168.100.21"
+  - name: "Laptop-2"
+    ip: ""
+  - name: "Laptop-3"
+    ip: ""

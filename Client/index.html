@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pizarra colaborativa</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="toolbar">
+        <h1>Pizarra</h1>
+        <label>
+          Servidor
+          <input id="server-url" value="" placeholder="ws://IP_DEL_SERVIDOR:3005" />
+        </label>
+        <button id="connect-button" type="button">Conectar</button>
+        <button id="clear-button" type="button" disabled>Limpiar</button>
+        <span id="status">Desconectado</span>
+      </header>
+
+      <canvas id="board" aria-label="Pizarra para dibujar"></canvas>
+    </main>
+
+    <script type="module" src="./src/index.js"></script>
+  </body>
+</html>
