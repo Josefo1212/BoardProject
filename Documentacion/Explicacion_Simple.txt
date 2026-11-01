@@ -1,0 +1,266 @@
+PIZARRA COLABORATIVA EN TIEMPO REAL
+EXPLICACION SENCILLA (SIN CODIGO)
+==================================================
+
+1. QUE ES EL PROGRAMA
+--------------------------------------------------
+Es una pizarra compartida por Internet local (WiFi). Varias laptops abren
+el mismo programa, se conectan al mismo servidor y ven la misma pizarra.
+
+Si una persona dibuja en su laptop, las demas ven el dibujo casi al
+instante. Si una borra la pizarra, a todas se les borra. Si una se
+desconecta y vuelve a entrar, recibe la pizarra tal como esta en ese
+momento.
+
+El programa tiene dos partes:
+
+- El servidor: es el coordinador central. Recibe lo que dibuja cada
+  laptop, lo guarda en memoria y se lo reenvia a las demas.
+- El cliente: es la pantalla o pagina que usa cada persona para dibujar.
+  Se conecta al servidor y muestra lo que pasa en la pizarra.
+
+El backend ya esta terminado. El cliente actual es una base sencilla y
+todavia debe completarse para aprovechar el tiempo real punto por punto.
+
+
+2. IDEA FACIL PARA ENTENDERLO
+--------------------------------------------------
+Imagina un salon de clases:
+
+- El servidor es el profesor que tiene un cuaderno central.
+- Cada laptop es un alumno con una hoja.
+- Cuando un alumno dibuja algo, se lo avisa al profesor.
+- El profesor revisa que el dibujo sea valido, lo copia en su cuaderno
+  y avisa a los demas alumnos para que lo copien en sus hojas.
+- Si un alumno nuevo llega, el profesor le entrega una copia completa
+  de todo lo que hay en el cuaderno.
+- Si alguien borra la pizarra, el profesor borra su cuaderno y avisa a
+  todos para que borren sus hojas.
+- Si el profesor cierra el salon, primero guarda una copia del cuaderno
+  en un archivo para no perder el trabajo.
+
+Ese cuaderno central es lo que permite que todos vean lo mismo.
+
+
+3. PIEZAS PRINCIPALES
+--------------------------------------------------
+Servidor:
+  Es un programa que se queda encendido esperando conexiones. Atiende a
+  todas las laptops al mismo tiempo.
+
+Cliente:
+  Es la pagina web donde la persona dibuja. Puede estar en la misma
+  computadora del servidor o en otra laptop conectada a la misma WiFi.
+
+Conexion WebSocket:
+  Es un canal abierto y permanente entre cada laptop y el servidor.
+  Permite enviar y recibir informacion en tiempo real sin tener que
+  preguntar una y otra vez si hay novedades.
+
+Pizarra en memoria:
+  Es la lista de trazos que el servidor mantiene mientras esta
+  encendido. Cada trazo guarda sus puntos y su estilo (color, grosor,
+  opacidad).
+
+Archivo de respaldo:
+  Es un archivo donde el servidor guarda la pizarra para recuperarla si
+  se reinicia. Se guarda solo lo que ya esta terminado.
+
+
+4. FLUJO COMPLETO, PASO A PASO
+--------------------------------------------------
+4.1 Se enciende el servidor
+  El servidor lee su configuracion: en que direccion escuchar, en que
+  puerto, cuantos clientes aceptar, que limites aplicar y si debe guardar
+  la pizarra en disco. Despues queda esperando conexiones.
+
+4.2 Una laptop se conecta
+  La laptop abre la pagina del cliente y pulsa "Conectar". El cliente
+  abre el canal WebSocket con el servidor.
+  El servidor revisa:
+  - Que el origen de la pagina este permitido.
+  - Que la IP este autorizada, si el modo de acceso es por lista.
+  - Que no se haya alcanzado el maximo de clientes.
+  Si todo esta bien, le asigna un identificador unico, lo registra y le
+  envia una copia completa de la pizarra actual.
+  Tambien avisa a los demas cuantas personas hay conectadas.
+
+4.3 Una persona empieza a dibujar
+  El cliente puede avisar tres cosas por cada trazo:
+  - Que empezo un trazo, con su identificador, el primer punto y el
+    estilo.
+  - Que agrego mas puntos mientras mueve el dedo, el lapiz o el mouse.
+  - Que termino el trazo.
+  El servidor recibe cada aviso, lo revisa y lo reenvia a las demas
+  laptops. Asi los demas ven el trazo ir apareciendo en vivo, no solo al
+  final.
+
+4.4 Una persona termina un trazo
+  El servidor confirma que el trazo pertenece a esa persona, lo marca
+  como terminado y lo deja guardado en la pizarra central. Luego avisa a
+  los demas que el trazo termino.
+
+4.5 Alguien borra la pizarra
+  El cliente avisa al servidor. El servidor elimina todos los trazos de
+  su memoria y avisa a todos para que borren sus pantallas. Este cambio
+  tambien queda guardado en el archivo de respaldo.
+
+4.6 Alguien se desconecta
+  El servidor lo elimina de la lista de conectados y avisa a los demas
+  cuantas personas quedan. Los trazos que ya estaban guardados no se
+  pierden.
+
+4.7 El servidor se reinicia
+  Si la persistencia esta activada, el servidor lee el archivo de
+  respaldo al arrancar y vuelve a cargar los trazos terminados. Un
+  cliente que entre despues recibe esa pizarra restaurada.
+
+4.8 El servidor se apaga
+  Antes de cerrarse, guarda la pizarra, avisa a los clientes que el
+  servidor se esta apagando y cierra las conexiones de forma ordenada.
+
+
+5. QUE HACE EL SERVIDOR CON CADA MENSAJE
+--------------------------------------------------
+El servidor sigue siempre el mismo orden:
+
+1. Recibe el mensaje.
+2. Revisa que sea texto y que se pueda entender.
+3. Controla que la persona no este enviando demasiados mensajes.
+4. Comprueba que el mensaje tenga un tipo conocido.
+5. Valida los datos: identificador del trazo, puntos, coordenadas y
+   estilo.
+6. Verifica que el trazo pertenezca al cliente que lo esta modificando.
+7. Revisa que no se superen los limites de la pizarra.
+8. Actualiza la pizarra central en memoria.
+9. Reenvia el mensaje a todos los demas clientes conectados.
+10. Si el cambio debe conservarse, programa el guardado en disco.
+
+Si algo no cumple las reglas, el servidor no cambia la pizarra y le
+responde al cliente con un aviso de error.
+
+
+6. SEGURIDAD Y ORDEN
+--------------------------------------------------
+El servidor no acepta cualquier cosa. Aplica estas protecciones:
+
+- Solo acepta mensajes de texto con un formato conocido.
+- Las coordenadas de los puntos deben estar dentro del area de la
+  pizarra, entre 0 y 1.
+- El color, el grosor y la opacidad tienen valores permitidos.
+- Cada trazo tiene un dueno. Nadie puede modificar el trazo de otra
+  persona.
+- Existe un maximo de trazos y de puntos para evitar que la memoria se
+  llene.
+- Existe un limite de mensajes por segundo para evitar abusos.
+- Un cliente que envia demasiados mensajes invalidos puede ser
+  desconectado.
+- El servidor revisa cada cierto tiempo que las conexiones sigan vivas.
+  Si una laptop dejo de responder, cierra esa conexion.
+- Si un cliente esta muy lento y acumula demasiada informacion sin leer,
+  el servidor deja de enviarle mensajes para no afectar a los demas.
+- Se puede limitar el acceso por IP y por origen de la pagina.
+
+Nada de esto cambia la idea principal: el servidor protege el cuaderno
+central y mantiene la pizarra estable para todos.
+
+
+7. CONFIGURACION EXPLICADA FACIL
+--------------------------------------------------
+El servidor se configura con un archivo de texto. Los conceptos son:
+
+Direccion y puerto:
+  Indican donde escucha el servidor. La direccion abierta permite que se
+  conecten otras laptops de la red. El puerto es como la puerta por donde
+  entran las conexiones.
+
+Maximo de clientes:
+  Cuantas laptops pueden estar conectadas al mismo tiempo.
+
+Intervalo de latido:
+  Cada cuanto tiempo el servidor pregunta "sigues ahi?" a cada laptop.
+
+Modo de acceso:
+  Puede ser abierto (cualquiera de la red puede entrar) o por lista
+  (solo las IP autorizadas pueden entrar).
+
+Lista de origenes permitidos:
+  Desde que paginas se permite abrir la conexion.
+
+Limites:
+  Maximo de trazos, maximo de puntos por trazo, maximo total de puntos y
+  maximo de mensajes por segundo.
+
+Persistencia:
+  Si esta activada, la pizarra se guarda en un archivo. Tambien se
+  configura la ruta del archivo y el tiempo de espera antes de guardar.
+
+
+8. QUE PASA SI...
+--------------------------------------------------
+...dos personas dibujan al mismo tiempo?
+  Cada una tiene su propio trazo con un identificador distinto. El
+  servidor los guarda por separado y reenvia ambos. No se mezclan.
+
+...una persona intenta modificar el trazo de otra?
+  El servidor lo rechaza porque cada trazo tiene un dueno.
+
+...se pierde la conexion de una laptop?
+  El servidor la elimina de la lista y avisa a los demas. La laptop puede
+  volver a conectarse y recibira la pizarra actual completa.
+
+...se llena la pizarra?
+  El servidor rechaza nuevos trazos o puntos y avisa del limite. Los
+  trazos que ya existen se conservan.
+
+...el servidor se cae de golpe?
+  Si la persistencia estaba activada, al volver a arrancar recupera lo
+  ultimo que alcanzo a guardar.
+
+...una laptop entra tarde?
+  Al conectarse recibe una copia completa de todos los trazos actuales.
+
+
+9. PARA QUE SIRVE CADA PARTE DEL BACKEND
+--------------------------------------------------
+Parte de arranque:
+  Prepara la configuracion, enciende el servidor y controla el apagado
+  ordenado.
+
+Parte de configuracion:
+  Lee el archivo de configuracion, aplica valores por defecto y revisa
+  que todo tenga sentido.
+
+Parte de comunicacion:
+  Es el corazon del backend. Acepta clientes, recibe mensajes, valida,
+  actualiza la pizarra, reenvia cambios, controla latidos, limites y
+  guarda el respaldo.
+
+Parte de pruebas:
+  Comprueba automaticamente que la difusion de trazos, el tiempo real,
+  el borrado, los errores, el acceso por lista y la persistencia
+  funcionen bien.
+
+
+10. ESTADO ACTUAL
+--------------------------------------------------
+El backend esta completo y probado. Puede:
+- Recibir varias laptops por WiFi.
+- Compartir trazos en tiempo real usando avisos de inicio, puntos y fin.
+- Entregar la pizarra completa a quien se conecte.
+- Borrar la pizarra para todos.
+- Guardar y recuperar la pizarra.
+- Controlar errores, abusos, limites y desconexiones.
+
+El cliente actual es una version basica. Puede conectarse, dibujar y
+borrar, pero todavia envia el trazo completo al final. Para que el
+usuario vea el trazo apareciendo punto por punto en las demas laptops,
+el frontend debe enviar los avisos de inicio, puntos y fin que el
+servidor ya soporta.
+
+
+11. RESUMEN EN UNA FRASE
+--------------------------------------------------
+El servidor es el cuaderno central de la pizarra: recibe lo que dibuja
+cada laptop, lo valida, lo guarda, lo comparte con las demas y conserva
+una copia para que nada se pierda.
