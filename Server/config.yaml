@@ -1,11 +1,25 @@
 server:
   host: "0.0.0.0"
   port: 3005
+  maxClients: 50
+  pingIntervalMs: 30000
+  maxPayloadBytes: 262144
+  maxBufferedBytes: 8388608
 
-clients:
-  - name: "Laptop-1"
-    ip: "192.168.100.21"
-  - name: "Laptop-2"
-    ip: ""
-  - name: "Laptop-3"
-    ip: ""
+access:
+  mode: "open"
+  allowedOrigins:
+    - "*"
+  allowedIps:
+    - "192.168.100.21"
+
+limits:
+  maxStrokes: 5000
+  maxPointsPerStroke: 10000
+  maxTotalPoints: 2000000
+  maxMessagesPerSecond: 500
+
+persistence:
+  enabled: true
+  file: "data/board.json"
+  debounceMs: 500
