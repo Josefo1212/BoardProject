@@ -1,3 +1,33 @@
+    import { Board } from "./js/Board.js";
+    import { Communication } from "./js/Communication.js";
+    import { $$, els } from "./js/dom.js";
+    import { state } from "./js/state.js";
+    import {
+      CURSOR_THROTTLE_MS,
+      MAX_WIDTH,
+      MIN_WIDTH,
+      PALETTE,
+      POINT_BATCH_MAX,
+      POINT_BATCH_MS,
+      REFERENCE_WIDTH,
+      SERVER_URL,
+      STORAGE,
+      TOOL_NAMES,
+    } from "./js/config.js";
+    import {
+      clamp,
+      cloneStroke,
+      debounce,
+      hexToRgb,
+      isHexColor,
+      isLightColor,
+      normalizeHex,
+      safeParse,
+      shortId,
+      storageGet,
+      storageSet,
+    } from "./js/utils.js";
+
     "use strict";
 
     /* ============================================================
@@ -16,279 +46,21 @@
          1. ESTADO Y CONSTANTES
          ============================================================ */
 
-      const DEFAULT_SERVER = "ws://127.0.0.1:3005";
-      const STORAGE = {
-        server: "pizarra.server.v1",
-        name: "pizarra.name.v1",
-        color: "pizarra.color.v1",
-        theme: "pizarra.theme.v1",
-        recents: "pizarra.recents.v1",
-        brush: "pizarra.brush.v1",
-        eraser: "pizarra.eraser.v1",
-      };
-
-      // 20 colores alegres. Los 9 primeros son los atajos 1-9.
-      const PALETTE = [
-        { hex: "#ff4d6d", name: "Coral" },
-        { hex: "#ff7a45", name: "Naranja" },
-        { hex: "#ffb703", name: "Amarillo" },
-        { hex: "#9bdc28", name: "Lima" },
-        { hex: "#2ec4b6", name: "Menta" },
-        { hex: "#4cc9f0", name: "Celeste" },
-        { hex: "#4361ee", name: "Azul" },
-        { hex: "#7b2cbf", name: "Violeta" },
-        { hex: "#ff6fb5", name: "Rosa" },
-        { hex: "#e63946", name: "Rojo" },
-        { hex: "#172033", name: "Tinta" },
-        { hex: "#7b8092", name: "Gris" },
-        { hex: "#a67c52", name: "Marrón" },
-        { hex: "#ffffff", name: "Blanco" },
-        { hex: "#fde2e4", name: "Rosa pastel" },
-        { hex: "#d0f4de", name: "Verde pastel" },
-        { hex: "#fff1b8", name: "Amarillo pastel" },
-        { hex: "#d7e3ff", name: "Azul pastel" },
-        { hex: "#c77dff", name: "Lavanda" },
-        { hex: "#ffd166", name: "Dorado" },
-      ];
-
-      const TOOL_NAMES = {
-        brush: "Pincel",
-        eraser: "Borrador",
-        fill: "Cubeta",
-        line: "Línea",
-        rect: "Rectángulo",
-        circle: "Círculo",
-      };
-
-      const MIN_WIDTH = 1;
-      const MAX_WIDTH = 80;
-      const REFERENCE_WIDTH = 900; // el grosor se escala con el lienzo
-      const POINT_PRECISION = 5;
-      const POINT_BATCH_MS = 55;
-      const POINT_BATCH_MAX = 32;
-      const CURSOR_THROTTLE_MS = 80;
-
-      const state = {
-        // Herramientas
-        tool: "brush",
-        color: "#6c5ce7",
-        brushWidth: 6,
-        eraserWidth: 30,
-        recentColors: [],
-        theme: "light",
-
-        // Preferencias
-        userName: "Artista",
-        serverUrl: DEFAULT_SERVER,
-
-        // Red
-        status: "disconnected", // disconnected | connecting | connected | reconnecting
-        socket: null,
-        socketGeneration: 0,
-        clientId: null,
-        manualClose: false,
-        reconnectAttempts: 0,
-        reconnectTimer: null,
-        reconnectAt: 0,
-        pingTimer: null,
-        pingSentAt: 0,
-        latency: null,
-        serverFeatures: new Set(),
-        helloGeneration: -1,
-        lastStatusMessage: "",
-
-        // Presencia
-        userCount: 0,
-        users: [],
-
-        // Pizarra
-        strokes: new Map(), // trazos completos y efectivos
-        active: new Map(), // trazos remotos en curso
-        localActive: null,
-        offlineQueue: [],
-        undoStack: [],
-        redoStack: [],
-        viewW: 1,
-        viewH: 1,
-        dpr: 1,
-
-        // Puntero
-        pointerId: null,
-        hoverPointerType: "mouse",
-        penSeen: false,
-        lastCursorSend: 0,
-        cursorVisible: false,
-
-        // Varios
-        lastErrorKey: "",
-        lastErrorAt: 0,
-        baseRaf: 0,
-        liveRaf: 0,
-        layoutRaf: 0,
-        initialized: false,
-      };
-
-      /* ============================================================
-         REFERENCIAS DEL DOM
-         ============================================================ */
-
-      const $ = (selector) => document.querySelector(selector);
-      const $$ = (selector) => Array.from(document.querySelectorAll(selector));
-
-      const els = {
-        root: document.documentElement,
-        metaTheme: $('meta[name="theme-color"]'),
-        stage: $("#stage"),
-        boardHolder: $("#board-holder"),
-        boardFrame: $("#board-frame"),
-        canvasShell: $("#canvas-shell"),
-        base: $("#board"),
-        overlay: $("#overlay"),
-        emptyState: $("#empty-state"),
-        liveBadge: $("#live-badge"),
-        liveText: $("#live-text"),
-        canvasTip: $("#canvas-tip"),
-        cursorRing: $("#cursor-ring"),
-        remoteCursors: $("#remote-cursors"),
-
-        serverInput: $("#server-url"),
-        connectButton: $("#connect-button"),
-        connectLabel: $("#connect-label"),
-        connectIconUse: $("#connect-icon use"),
-        statusPill: $("#status-pill"),
-        statusText: $("#status-text"),
-
-        usersPill: $("#users-pill"),
-        userCount: $("#user-count"),
-        userName: $("#user-name"),
-        userAvatar: $("#user-avatar"),
-        themeToggle: $("#theme-toggle"),
-        helpButton: $("#help-button"),
-
-        toolButtons: $$(".tool-btn"),
-        sizeSlider: $("#size-slider"),
-        sizeSliderMobile: $("#size-slider-mobile"),
-        sizeValue: $("#size-value"),
-        sizeDot: $("#size-dot"),
-        sizeDotMobile: $("#size-dot-mobile"),
-        sizeDotPopover: $("#size-dot-popover"),
-        sizePopoverValue: $("#size-popover-value"),
-        sizeToggle: $("#size-toggle"),
-        sizePopover: $("#size-popover"),
-
-        dock: $("#dock"),
-        colorToggle: $("#color-toggle"),
-        currentColorDot: $("#current-color-dot"),
-        paletteRow: $("#palette-row"),
-        palette: $("#palette"),
-        customColor: $("#custom-color"),
-        recentColors: $("#recent-colors"),
-
-        undoButton: $("#undo-btn"),
-        redoButton: $("#redo-btn"),
-        clearButton: $("#clear-btn"),
-        saveButton: $("#save-btn"),
-
-        toastStack: $("#toast-stack"),
-        confettiLayer: $("#confetti-layer"),
-        srLive: $("#sr-live"),
-
-        clearDialog: $("#clear-dialog"),
-        clearDescription: $("#clear-description"),
-        confirmClear: $("#confirm-clear"),
-        helpDialog: $("#help-dialog"),
-      };
-
-      const baseCtx = els.base.getContext("2d", { willReadFrequently: true });
-      const liveCtx = els.overlay.getContext("2d");
+      const board = new Board({ base: els.base, overlay: els.overlay });
+      const baseCtx = board.baseContext;
+      const liveCtx = board.overlayContext;
+      const communication = new Communication();
 
       /* ============================================================
          2. UTILIDADES Y PERSISTENCIA
          ============================================================ */
 
-      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-      const roundPoint = (value) => Number(value.toFixed(POINT_PRECISION));
-
-      function safeParse(value, fallback) {
-        try {
-          return JSON.parse(value);
-        } catch {
-          return fallback;
-        }
-      }
-
-      function storageGet(key, fallback = null) {
-        try {
-          const value = localStorage.getItem(key);
-          return value === null ? fallback : value;
-        } catch {
-          return fallback;
-        }
-      }
-
-      function storageSet(key, value) {
-        try {
-          localStorage.setItem(key, value);
-        } catch {
-          /* localStorage puede estar bloqueado; la app sigue funcionando */
-        }
-      }
-
-      function isHexColor(value) {
-        return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
-      }
-
-      function normalizeHex(value) {
-        if (typeof value !== "string") return null;
-        let hex = value.trim();
-        if (/^#[0-9a-f]{3}$/i.test(hex)) {
-          hex = "#" + hex.slice(1).split("").map((char) => char + char).join("");
-        }
-        return isHexColor(hex) ? hex.toLowerCase() : null;
-      }
-
-      function hexToRgb(hex) {
-        const safe = normalizeHex(hex) || "#000000";
-        return {
-          r: parseInt(safe.slice(1, 3), 16),
-          g: parseInt(safe.slice(3, 5), 16),
-          b: parseInt(safe.slice(5, 7), 16),
-        };
-      }
-
-      function isLightColor(hex) {
-        const { r, g, b } = hexToRgb(hex);
-        return (r * 299 + g * 587 + b * 114) / 1000 > 168;
-      }
-
-      function shortId() {
-        // ID corto y válido para el servidor: letras, números, guiones y "_".
-        return "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      }
-
-      function cloneStroke(stroke) {
-        return {
-          strokeId: stroke.strokeId,
-          points: stroke.points.map((point) => ({ ...point })),
-          style: { ...stroke.style },
-          authorId: stroke.authorId,
-          complete: stroke.complete !== false,
-        };
-      }
-
-      function debounce(fn, wait) {
-        let timer = 0;
-        return (...args) => {
-          clearTimeout(timer);
-          timer = setTimeout(() => fn(...args), wait);
-        };
-      }
+      const roundPoint = (value) => Number(value.toFixed(5));
 
       const saveNameLater = debounce(() => storageSet(STORAGE.name, state.userName), 350);
       const announceNameLater = debounce(() => sendHello(), 500);
 
-      function readStoredPreferences() {
-        const storedServer = storageGet(STORAGE.server, "");
+      const readStoredPreferences = () => {
         const storedName = storageGet(STORAGE.name, "");
         const storedColor = storageGet(STORAGE.color, "");
         const storedTheme = storageGet(STORAGE.theme, "");
@@ -296,7 +68,6 @@
         const storedBrush = Number(storageGet(STORAGE.brush, "6"));
         const storedEraser = Number(storageGet(STORAGE.eraser, "30"));
 
-        state.serverUrl = typeof storedServer === "string" && storedServer.trim() ? storedServer.trim() : DEFAULT_SERVER;
         state.userName = (typeof storedName === "string" && storedName.trim()).slice(0, 20) || "Artista";
         state.color = normalizeHex(storedColor) || "#6c5ce7";
         state.brushWidth = clamp(Number.isFinite(storedBrush) ? storedBrush : 6, MIN_WIDTH, MAX_WIDTH);
@@ -313,12 +84,12 @@
         }
       }
 
-      function saveToolWidths() {
+      const saveToolWidths = () => {
         storageSet(STORAGE.brush, String(Math.round(state.brushWidth)));
         storageSet(STORAGE.eraser, String(Math.round(state.eraserWidth)));
       }
 
-      function rememberColor(hex) {
+      const rememberColor = (hex) => {
         const safe = normalizeHex(hex);
         if (!safe) return;
         state.recentColors = [safe, ...state.recentColors.filter((color) => color !== safe)].slice(0, 6);
@@ -330,7 +101,7 @@
          3. TEMA, PALETA Y CONTROLES
          ============================================================ */
 
-      function applyTheme(theme, persist = true) {
+      const applyTheme = (theme, persist = true) => {
         state.theme = theme === "dark" ? "dark" : "light";
         els.root.dataset.theme = state.theme;
         els.themeToggle.setAttribute(
@@ -343,11 +114,11 @@
         if (persist) storageSet(STORAGE.theme, state.theme);
       }
 
-      function toggleTheme() {
+      const toggleTheme = () => {
         applyTheme(state.theme === "dark" ? "light" : "dark");
       }
 
-      function renderPalette() {
+      const renderPalette = () => {
         els.palette.innerHTML = "";
         PALETTE.forEach((color, index) => {
           const button = document.createElement("button");
@@ -363,7 +134,7 @@
         });
       }
 
-      function renderRecentColors() {
+      const renderRecentColors = () => {
         els.recentColors.innerHTML = "";
         if (!state.recentColors.length) return;
 
@@ -386,7 +157,7 @@
         });
       }
 
-      function selectColor(hex, { remember = true } = {}) {
+      const selectColor = (hex, { remember = true } = {}) => {
         const safe = normalizeHex(hex);
         if (!safe) return;
 
@@ -409,7 +180,7 @@
         }
       }
 
-      function syncColorUI() {
+      const syncColorUI = () => {
         const light = isLightColor(state.color);
 
         $$(".swatch").forEach((swatch) => {
@@ -425,7 +196,7 @@
         updateSizeUI();
       }
 
-      function setTool(tool) {
+      const setTool = (tool) => {
         if (!TOOL_NAMES[tool]) return;
 
         state.tool = tool;
@@ -456,15 +227,15 @@
         }
       }
 
-      function activeWidth() {
+      const activeWidth = () => {
         return state.tool === "eraser" ? state.eraserWidth : state.brushWidth;
       }
 
-      function renderedWidth(width) {
+      const renderedWidth = (width) => {
         return Math.max(0.5, width * (state.viewW / REFERENCE_WIDTH));
       }
 
-      function setSize(value, { save = true } = {}) {
+      const setSize = (value, { save = true } = {}) => {
         const width = clamp(Math.round(Number(value) || MIN_WIDTH), MIN_WIDTH, MAX_WIDTH);
         if (state.tool === "eraser") {
           state.eraserWidth = width;
@@ -476,7 +247,7 @@
         updateCursorAppearance();
       }
 
-      function updateSizeUI() {
+      const updateSizeUI = () => {
         const width = activeWidth();
         els.sizeSlider.value = String(width);
         els.sizeSliderMobile.value = String(width);
@@ -495,15 +266,16 @@
         els.sizeSliderMobile.disabled = disabled;
       }
 
-      function connected() {
-        return state.status === "connected" && state.socket && state.socket.readyState === WebSocket.OPEN;
+      const connected = () => {
+        const socket = communication.socket;
+        return state.status === "connected" && socket && socket.readyState === WebSocket.OPEN;
       }
 
-      function hasFeature(name) {
+      const hasFeature = (name) => {
         return state.serverFeatures.has(name);
       }
 
-      function updateUserIdentityUI() {
+      const updateUserIdentityUI = () => {
         const name = state.userName.trim() || "Artista";
         const initial = Array.from(name)[0] || "A";
         els.userAvatar.textContent = initial.toUpperCase();
@@ -519,7 +291,7 @@
          4. MEDIDAS DEL LIENZO
          ============================================================ */
 
-      function layoutBoard() {
+      const layoutBoard = () => {
         const rect = els.boardHolder.getBoundingClientRect();
         const styles = getComputedStyle(els.root);
         const pad = parseFloat(styles.getPropertyValue("--frame-pad")) || 11;
@@ -538,7 +310,7 @@
         els.boardFrame.style.height = `${Math.round(innerH + pad * 2)}px`;
       }
 
-      function scheduleLayout() {
+      const scheduleLayout = () => {
         cancelAnimationFrame(state.layoutRaf);
         state.layoutRaf = requestAnimationFrame(() => {
           layoutBoard();
@@ -563,28 +335,17 @@
         const pixelW = Math.max(1, Math.round(rect.width * dpr));
         const pixelH = Math.max(1, Math.round(rect.height * dpr));
 
-        if (els.base.width !== pixelW || els.base.height !== pixelH) {
-          els.base.width = pixelW;
-          els.base.height = pixelH;
-          els.overlay.width = pixelW;
-          els.overlay.height = pixelH;
-        }
-
         state.viewW = rect.width;
         state.viewH = rect.height;
         state.dpr = dpr;
-
-        baseCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        liveCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        baseCtx.imageSmoothingEnabled = true;
-        liveCtx.imageSmoothingEnabled = true;
+        board.resize(pixelW, pixelH, dpr);
 
         redrawBase();
         redrawLive();
         updateCursorAppearance();
       };
 
-      function parseStyle(style) {
+      const parseStyle = (style) => {
         const raw = String(style?.color || "#172033").trim();
         const info = { type: "brush", color: raw, shape: "", eraser: false };
 
@@ -617,7 +378,7 @@
         return info;
       }
 
-      function normalizePoint(point) {
+      const normalizePoint = (point) => {
         if (!point || typeof point !== "object") return null;
         const x = Number(point.x);
         const y = Number(point.y);
@@ -630,7 +391,7 @@
         return out;
       }
 
-      function normalizeStyle(style) {
+      const normalizeStyle = (style) => {
         const out = {};
         if (style && typeof style === "object") {
           if (typeof style.color === "string" && style.color.trim()) {
@@ -648,15 +409,15 @@
         return out;
       }
 
-      function styleWidth(style) {
+      const styleWidth = (style) => {
         return renderedWidth(clamp(Number(style?.width) || 3, 0.5, 100));
       }
 
-      function pressureFactor(point) {
+      const pressureFactor = (point) => {
         return Number.isFinite(point?.pressure) ? 0.5 + clamp(point.pressure, 0, 1) * 0.9 : 1;
       }
 
-      function midpoint(a, b) {
+      const midpoint = (a, b) => {
         return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
       }
 
@@ -664,7 +425,7 @@
        * Dibuja un trazo completo en el contexto indicado.
        * Usa curvas cuadráticas entre puntos medios: extremos suaves, sin picos.
        */
-      function drawStroke(ctx, stroke, pointsOverride = null) {
+      const drawStroke = (ctx, stroke, pointsOverride = null) => {
         const points = pointsOverride || stroke?.points;
         if (!Array.isArray(points) || points.length === 0) return;
 
@@ -749,7 +510,7 @@
         ctx.restore();
       }
 
-      function redrawBase() {
+      const redrawBase = () => {
         if (state.viewW < 2 || state.viewH < 2) return;
         baseCtx.clearRect(0, 0, state.viewW, state.viewH);
 
@@ -758,7 +519,7 @@
         }
       }
 
-      function redrawLive() {
+      const redrawLive = () => {
         if (state.viewW < 2 || state.viewH < 2) return;
         liveCtx.clearRect(0, 0, state.viewW, state.viewH);
 
@@ -778,7 +539,7 @@
         }
       }
 
-      function requestBaseRedraw() {
+      const requestBaseRedraw = () => {
         if (state.baseRaf) return;
         state.baseRaf = requestAnimationFrame(() => {
           state.baseRaf = 0;
@@ -786,7 +547,7 @@
         });
       }
 
-      function requestLiveRedraw() {
+      const requestLiveRedraw = () => {
         if (state.liveRaf) return;
         state.liveRaf = requestAnimationFrame(() => {
           state.liveRaf = 0;
@@ -795,7 +556,7 @@
       }
 
       /** Aplica un trazo ya confirmado al canvas base. */
-      function renderStrokeToBase(stroke) {
+      const renderStrokeToBase = (stroke) => {
         const info = parseStyle(stroke?.style);
         if (info.type === "fill") {
           const point = stroke.points?.[0];
@@ -810,7 +571,7 @@
          Cubeta de relleno (scanline flood fill)
          ------------------------------------------------------------ */
 
-      function floodFill(ctx, nx, ny, colorHex) {
+      const floodFill = (ctx, nx, ny, colorHex) => {
         const w = ctx.canvas.width;
         const h = ctx.canvas.height;
         if (!w || !h) return false;
@@ -901,7 +662,7 @@
          Borrador incremental
          ------------------------------------------------------------ */
 
-      function eraseDot(point, width) {
+      const eraseDot = (point, width) => {
         const x = clamp(point.x, 0, 1) * state.viewW;
         const y = clamp(point.y, 0, 1) * state.viewH;
         const radius = Math.max(width / 2, 0.5);
@@ -913,7 +674,7 @@
         baseCtx.restore();
       }
 
-      function eraseLine(from, to, widthFrom, widthTo) {
+      const eraseLine = (from, to, widthFrom, widthTo) => {
         const x1 = clamp(from.x, 0, 1) * state.viewW;
         const y1 = clamp(from.y, 0, 1) * state.viewH;
         const x2 = clamp(to.x, 0, 1) * state.viewW;
@@ -930,7 +691,7 @@
         baseCtx.restore();
       }
 
-      function applyEraserFrom(active, fromIndex) {
+      const applyEraserFrom = (active, fromIndex) => {
         if (!active || !Array.isArray(active.points) || active.points.length === 0) return;
         const width = styleWidth(active.style);
 
@@ -957,7 +718,7 @@
          Altas de trazos
          ------------------------------------------------------------ */
 
-      function updateArtUI() {
+      const updateArtUI = () => {
         const hasArt =
           state.strokes.size > 0 ||
           state.active.size > 0 ||
@@ -966,7 +727,7 @@
         syncHistoryUI();
       }
 
-      function canUndo() {
+      const canUndo = () => {
         if (!state.undoStack.length) return false;
         return state.undoStack.some((id) => {
           const stroke = state.strokes.get(id);
@@ -974,13 +735,13 @@
         });
       }
 
-      function isOwnStroke(stroke) {
+      const isOwnStroke = (stroke) => {
         if (!stroke) return false;
         if (stroke.authorId === "local") return true;
         return Boolean(state.clientId) && stroke.authorId === state.clientId;
       }
 
-      function syncHistoryUI() {
+      const syncHistoryUI = () => {
         const undoAvailable = canUndo();
         els.undoButton.disabled = !undoAvailable;
         els.redoButton.disabled = state.redoStack.length === 0;
@@ -988,7 +749,7 @@
         els.redoButton.setAttribute("aria-disabled", state.redoStack.length ? "false" : "true");
       }
 
-      function addCommittedStroke(stroke, { render = true, remember = true } = {}) {
+      const addCommittedStroke = (stroke, { render = true, remember = true } = {}) => {
         if (!stroke || typeof stroke.strokeId !== "string") return;
         state.strokes.set(stroke.strokeId, stroke);
         if (render) renderStrokeToBase(stroke);
@@ -1000,7 +761,7 @@
         updateArtUI();
       }
 
-      function queueOfflineStroke(stroke) {
+      const queueOfflineStroke = (stroke) => {
         state.offlineQueue.push(cloneStroke(stroke));
         if (state.offlineQueue.length > 500) state.offlineQueue.shift();
       }
@@ -1009,7 +770,7 @@
          Entrada del puntero
          ------------------------------------------------------------ */
 
-      function pointFromClient(clientX, clientY, pressure, pointerType) {
+      const pointFromClient = (clientX, clientY, pressure, pointerType) => {
         const rect = els.canvasShell.getBoundingClientRect();
         const x = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, 1);
         const y = clamp((clientY - rect.top) / Math.max(1, rect.height), 0, 1);
@@ -1024,24 +785,24 @@
         return point;
       }
 
-      function pointFromEvent(event) {
+      const pointFromEvent = (event) => {
         return pointFromClient(event.clientX, event.clientY, event.pressure, event.pointerType);
       }
 
-      function serializePoint(point) {
+      const serializePoint = (point) => {
         const out = { x: roundPoint(clamp(point.x, 0, 1)), y: roundPoint(clamp(point.y, 0, 1)) };
         if (Number.isFinite(point.pressure)) out.pressure = roundPoint(clamp(point.pressure, 0, 1));
         return out;
       }
 
-      function serializeStyle(style) {
+      const serializeStyle = (style) => {
         return {
           color: style.color,
           width: clamp(Number(style.width) || 1, 0.5, 100),
         };
       }
 
-      function sendStrokeStart(active) {
+      const sendStrokeStart = (active) => {
         if (!connected()) return;
         const ok = sendJson({
           type: "stroke-start",
@@ -1055,7 +816,7 @@
         }
       }
 
-      function flushPoints(active) {
+      const flushPoints = (active) => {
         if (!active) return;
         if (!active.sentStart || !connected()) {
           active.pending.length = 0;
@@ -1069,12 +830,12 @@
         active.lastSend = performance.now();
       }
 
-      function sendStrokeEnd(strokeId) {
+      const sendStrokeEnd = (strokeId) => {
         if (!connected()) return;
         sendJson({ type: "stroke-end", strokeId });
       }
 
-      function sendFullStroke(stroke) {
+      const sendFullStroke = (stroke) => {
         return sendJson({
           type: "stroke",
           strokeId: stroke.strokeId,
@@ -1083,7 +844,7 @@
         });
       }
 
-      function addPointToStroke(active, point, now) {
+      const addPointToStroke = (active, point, now) => {
         const last = active.points[active.points.length - 1];
         const distance = last
           ? Math.hypot((point.x - last.x) * state.viewW, (point.y - last.y) * state.viewH)
@@ -1114,7 +875,7 @@
         return true;
       }
 
-      function shapePoints(type, start, end) {
+      const shapePoints = (type, start, end) => {
         if (type === "line") {
           return [start, end];
         }
@@ -1145,12 +906,12 @@
         return points;
       }
 
-      function shapeStyle(type) {
+      const shapeStyle = (type) => {
         const prefix = { line: "shapeL:", rect: "shapeR:", circle: "shapeC:" }[type] || "shapeL:";
         return { color: prefix + state.color, width: state.brushWidth };
       }
 
-      function startLocalStroke(event) {
+      const startLocalStroke = (event) => {
         const point = pointFromEvent(event);
         state.pointerId = event.pointerId;
         state.lastCursorSend = 0;
@@ -1204,7 +965,6 @@
         };
 
         state.localActive = active;
-        sendStrokeStart(active);
 
         if (eraser) {
           applyEraserFrom(active, 0);
@@ -1221,7 +981,7 @@
         }
       }
 
-      function moveLocalStroke(event) {
+      const moveLocalStroke = (event) => {
         const active = state.localActive;
         if (!active) return;
 
@@ -1252,7 +1012,7 @@
         if (changed) requestLiveRedraw();
       }
 
-      function finishLocalStroke() {
+      const finishLocalStroke = () => {
         const active = state.localActive;
         if (!active) return;
 
@@ -1305,13 +1065,9 @@
           complete: true,
         };
 
-        if (active.sentStart && connected()) {
-          sendStrokeEnd(stroke.strokeId);
-        } else if (connected()) {
+        if (connected()) {
           sendFullStroke(stroke);
         } else {
-          // Si la conexión se perdió a mitad del trazo, se guarda completo.
-          // Al reconectar se enviará (con un ID nuevo si hay conflicto).
           queueOfflineStroke(stroke);
         }
 
@@ -1327,7 +1083,7 @@
         updateArtUI();
       }
 
-      function cancelLocalStroke() {
+      const cancelLocalStroke = () => {
         if (!state.localActive) return;
         const active = state.localActive;
         state.localActive = null;
@@ -1349,7 +1105,7 @@
          Cubeta
          ------------------------------------------------------------ */
 
-      function finishFillAt(point) {
+      const finishFillAt = (point) => {
         const changed = floodFill(baseCtx, point.x, point.y, state.color);
         if (!changed) return;
 
@@ -1380,7 +1136,7 @@
          Deshacer / rehacer
          ------------------------------------------------------------ */
 
-      function sendUndoCommand(targetId) {
+      const sendUndoCommand = (targetId) => {
         const color = `cmd:undo:${targetId}`;
         if (color.length > 32) return false;
         return sendJson({
@@ -1391,7 +1147,7 @@
         });
       }
 
-      function applyUndoCommand(message) {
+      const applyUndoCommand = (message) => {
         const targetId = String(message?.style?.color || "").slice("cmd:undo:".length);
         if (!targetId) return false;
         const target = state.strokes.get(targetId);
@@ -1405,7 +1161,7 @@
         return true;
       }
 
-      function undo() {
+      const undo = () => {
         if (!canUndo()) {
           showToast("info", "No hay nada que deshacer.", { duration: 2200 });
           return;
@@ -1443,7 +1199,7 @@
         updateArtUI();
       }
 
-      function redo() {
+      const redo = () => {
         const item = state.redoStack.pop();
         if (!item) {
           showToast("info", "No hay nada que rehacer.", { duration: 2200 });
@@ -1474,7 +1230,7 @@
          Limpiar y guardar
          ------------------------------------------------------------ */
 
-      function clearBoardFromServer(message) {
+      const clearBoardFromServer = (message) => {
         cancelLocalStroke();
         state.strokes.clear();
         state.active.clear();
@@ -1489,7 +1245,7 @@
         }
       }
 
-      function requestClear() {
+      const requestClear = () => {
         if (!state.strokes.size && !state.localActive && !state.active.size) {
           showToast("info", "La pizarra ya está vacía.", { duration: 2000 });
           return;
@@ -1501,7 +1257,7 @@
         els.clearDialog.showModal();
       }
 
-      function confirmClear() {
+      const confirmClear = () => {
         cancelLocalStroke();
         state.strokes.clear();
         state.active.clear();
@@ -1520,7 +1276,7 @@
         }
       }
 
-      function savePng() {
+      const savePng = () => {
         if (!state.strokes.size) {
           showToast("info", "Dibuja algo antes de guardar. ✏️", { duration: 2200 });
           return;
@@ -1569,7 +1325,7 @@
          5. INTERFAZ: TOASTS, CONFETI Y CURSOR
          ============================================================ */
 
-      function showToast(type, message, options = {}) {
+      const showToast = (type, message, options = {}) => {
         const toast = document.createElement("div");
         toast.className = `toast is-${type}`;
         const duration = options.duration || 2800;
@@ -1603,7 +1359,7 @@
         });
       }
 
-      function burstConfetti() {
+      const burstConfetti = () => {
         const colors = ["#6c5ce7", "#ff4d6d", "#ffb703", "#2ec4b6", "#4cc9f0", "#9bdc28", "#ff6fb5"];
         const count = 36;
         for (let i = 0; i < count; i += 1) {
@@ -1624,7 +1380,7 @@
         }
       }
 
-      function updateCursorAppearance() {
+      const updateCursorAppearance = () => {
         const ring = els.cursorRing;
         const core = ring.querySelector(".cursor-core");
         const customCursor =
@@ -1661,7 +1417,7 @@
          6. RED WEBSOCKET
          ============================================================ */
 
-      function setStatus(status, text) {
+      const setStatus = (status, text) => {
         state.status = status;
         els.statusPill.classList.remove("is-connected", "is-connecting", "is-reconnecting", "is-off");
         if (status === "connected") els.statusPill.classList.add("is-connected");
@@ -1699,23 +1455,20 @@
         updateArtUI();
       }
 
-      function sendJson(message) {
-        const socket = state.socket;
-        if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+      const sendJson = (message) => {
         try {
-          socket.send(JSON.stringify(message));
-          return true;
+          return communication.send(message);
         } catch {
           return false;
         }
       }
 
-      function clearRemoteCursors() {
+      const clearRemoteCursors = () => {
         els.remoteCursors.innerHTML = "";
         remoteCursorEls.clear();
       }
 
-      function updatePresenceUI() {
+      const updatePresenceUI = () => {
         const count = state.userCount || 0;
         els.userCount.textContent = String(count);
         els.usersPill.title = `${count} persona${count === 1 ? "" : "s"} conectada${count === 1 ? "" : "s"}`;
@@ -1728,7 +1481,7 @@
         }
       }
 
-      function resetBoardForSnapshot() {
+      const resetBoardForSnapshot = () => {
         cancelLocalStroke();
         state.strokes.clear();
         state.active.clear();
@@ -1741,7 +1494,7 @@
         updateArtUI();
       }
 
-      function flushOfflineQueue() {
+      const flushOfflineQueue = () => {
         if (!connected() || !state.offlineQueue.length) return;
 
         const queue = state.offlineQueue.splice(0, state.offlineQueue.length);
@@ -1785,14 +1538,14 @@
         }
       }
 
-      function sendHello() {
+      const sendHello = () => {
         // Solo se envía si el servidor anuncia soporte para nombres.
         if (!connected() || !hasFeature("names")) return;
         const name = state.userName.trim() || "Artista";
         sendJson({ type: "hello", name, color: state.color });
       }
 
-      function sendCursor(point, visible = true) {
+      const sendCursor = (point, visible = true) => {
         // Función opcional: el servidor actual no anuncia "cursors".
         if (!connected() || !hasFeature("cursors")) return;
         const now = performance.now();
@@ -1808,7 +1561,7 @@
         });
       }
 
-      function updateRemoteCursor(message) {
+      const updateRemoteCursor = (message) => {
         if (!hasFeature("cursors")) return;
         if (!message.authorId || message.authorId === state.clientId) return;
 
@@ -1844,7 +1597,7 @@
         entry.timer = setTimeout(() => entry.el.classList.add("is-hidden"), 6000);
       }
 
-      function handleMessage(raw) {
+      const handleMessage = (raw) => {
         let message;
         try {
           message = JSON.parse(raw);
@@ -2053,7 +1806,7 @@
         }
       }
 
-      function scheduleReconnect() {
+      const scheduleReconnect = () => {
         if (state.manualClose) return;
         if (state.reconnectTimer) return;
         state.reconnectAttempts += 1;
@@ -2065,7 +1818,7 @@
         }, delay);
       }
 
-      function normalizeServerUrl(raw) {
+      const normalizeServerUrl = (raw) => {
         let value = String(raw || "").trim();
         if (!value) return null;
         if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) value = "ws://" + value;
@@ -2084,10 +1837,11 @@
         return url.toString();
       }
 
-      function connect() {
+      const connect = () => {
+        const currentSocket = communication.socket;
         if (
-          state.socket &&
-          (state.socket.readyState === WebSocket.OPEN || state.socket.readyState === WebSocket.CONNECTING)
+          currentSocket &&
+          (currentSocket.readyState === WebSocket.OPEN || currentSocket.readyState === WebSocket.CONNECTING)
         ) {
           return;
         }
@@ -2097,99 +1851,87 @@
         state.manualClose = false;
         state.serverFeatures = new Set();
 
-        const url = normalizeServerUrl(els.serverInput.value || DEFAULT_SERVER);
+        const url = normalizeServerUrl(SERVER_URL);
         if (!url) {
-          showToast("warning", "La dirección del servidor no es válida. Usa algo como ws://127.0.0.1:3005", {
-            duration: 3600,
-          });
+          showToast("warning", "La dirección del servidor no es válida.", { duration: 3600 });
           setStatus("disconnected", "Desconectado");
           return;
         }
-
-        state.serverUrl = url;
-        els.serverInput.value = url;
-        storageSet(STORAGE.server, url);
 
         const generation = ++state.socketGeneration;
         setStatus(state.reconnectAttempts > 0 ? "reconnecting" : "connecting");
 
         try {
-          const socket = new WebSocket(url);
-          state.socket = socket;
           let opened = false;
+          const socket = communication.connect(url, {
+            open: () => {
+              if (generation !== state.socketGeneration) return;
+              opened = true;
+              state.everConnected = true;
+              state.reconnectAttempts = 0;
+              clearTimeout(state.reconnectTimer);
+              state.reconnectTimer = null;
+              setStatus("connected", "Conectado");
+              burstConfetti();
+            },
+            message: (event) => {
+              if (generation !== state.socketGeneration) return;
+              handleMessage(event.data);
+            },
+            close: (event) => {
+              if (generation !== state.socketGeneration) return;
+              state.socket = null;
 
-          socket.addEventListener("open", () => {
-            if (generation !== state.socketGeneration) return;
-            opened = true;
-            state.everConnected = true;
-            state.reconnectAttempts = 0;
-            clearTimeout(state.reconnectTimer);
-            state.reconnectTimer = null;
-            setStatus("connected", "Conectado");
-            burstConfetti();
-          });
+              if (state.localActive) finishLocalStroke();
+              state.active.clear();
+              clearRemoteCursors();
+              redrawLive();
+              updateArtUI();
 
-          socket.addEventListener("message", (event) => {
-            if (generation !== state.socketGeneration) return;
-            handleMessage(event.data);
-          });
-
-          socket.addEventListener("close", (event) => {
-            if (generation !== state.socketGeneration) return;
-            state.socket = null;
-
-            // Si había un trazo a medias, se termina y se guarda en local.
-            if (state.localActive) finishLocalStroke();
-            state.active.clear();
-            clearRemoteCursors();
-            redrawLive();
-            updateArtUI();
-
-            if (state.manualClose || event.code === 1000) {
-              setStatus("disconnected", "Desconectado");
-              return;
-            }
-
-            if (event.code === 1008) {
-              setStatus("disconnected", "Desconectado");
-              showToast("error", "El servidor rechazó la conexión. Revisa el origen o la IP permitida.", {
-                duration: 4600,
-              });
-              return;
-            }
-
-            if (!opened && !state.everConnected) {
-              setStatus("disconnected", "Desconectado");
-              if (event.code === 1006) {
-                showToast("error", "No se pudo conectar. ¿Está encendido el servidor?", {
-                  duration: 4400,
-                });
-              } else if (event.code === 1013) {
-                showToast("error", "El servidor está lleno. Inténtalo de nuevo en un momento.", {
-                  duration: 4400,
-                });
-              } else {
-                showToast("warning", `No se pudo conectar (código ${event.code}).`, { duration: 4000 });
+              if (state.manualClose || event.code === 1000) {
+                setStatus("disconnected", "Desconectado");
+                return;
               }
-              return;
-            }
 
-            if (event.code === 1006) {
-              showToast("error", "Se perdió la conexión. ¿Está encendido el servidor?", {
-                duration: 4200,
-              });
-            } else if (event.code === 1001) {
-              showToast("warning", "El servidor se está apagando. Intentando reconectar...", {
-                duration: 3600,
-              });
-            }
+              if (event.code === 1008) {
+                setStatus("disconnected", "Desconectado");
+                showToast("error", "El servidor rechazó la conexión. Revisa el origen o la IP permitida.", {
+                  duration: 4600,
+                });
+                return;
+              }
 
-            scheduleReconnect();
+              if (!opened && !state.everConnected) {
+                setStatus("disconnected", "Desconectado");
+                if (event.code === 1006) {
+                  showToast("error", "No se pudo conectar. ¿Está encendido el servidor?", {
+                    duration: 4400,
+                  });
+                } else if (event.code === 1013) {
+                  showToast("error", "El servidor está lleno. Inténtalo de nuevo en un momento.", {
+                    duration: 4400,
+                  });
+                } else {
+                  showToast("warning", `No se pudo conectar (código ${event.code}).`, { duration: 4000 });
+                }
+                return;
+              }
+
+              if (event.code === 1006) {
+                showToast("error", "Se perdió la conexión. ¿Está encendido el servidor?", {
+                  duration: 4200,
+                });
+              } else if (event.code === 1001) {
+                showToast("warning", "El servidor se está apagando. Intentando reconectar...", {
+                  duration: 3600,
+                });
+              }
+
+              scheduleReconnect();
+            },
+            error: () => {},
           });
-
-          socket.addEventListener("error", () => {
-            // El detalle real llega en el evento close.
-          });
+          state.socket = socket;
         } catch {
           state.socket = null;
           setStatus("disconnected", "Desconectado");
@@ -2197,20 +1939,14 @@
         }
       }
 
-      function disconnect() {
+      const disconnect = () => {
         state.manualClose = true;
         clearTimeout(state.reconnectTimer);
         state.reconnectTimer = null;
 
         if (state.localActive) finishLocalStroke();
 
-        if (state.socket) {
-          try {
-            state.socket.close(1000, "Cliente desconectado");
-          } catch {
-            /* ignore */
-          }
-        }
+        communication.disconnect();
 
         // Invalida los eventos pendientes del socket anterior.
         state.socket = null;
@@ -2227,12 +1963,12 @@
          7. EVENTOS DE UI
          ============================================================ */
 
-      function closeMobileColorPanel() {
+      const closeMobileColorPanel = () => {
         els.dock.classList.remove("is-palette-open");
         els.colorToggle.setAttribute("aria-expanded", "false");
       }
 
-      function closeSizePopover() {
+      const closeSizePopover = () => {
         els.sizePopover.classList.remove("is-open");
         els.sizeToggle.setAttribute("aria-expanded", "false");
       }
@@ -2241,13 +1977,12 @@
          8. ARRANQUE
          ============================================================ */
 
-      function init() {
+      const init = () => {
         if (state.initialized) return;
         state.initialized = true;
 
         readStoredPreferences();
         applyTheme(state.theme, false);
-        els.serverInput.value = state.serverUrl;
         state.userName = state.userName.trim() || "Artista";
         els.userName.value = state.userName;
         updateUserIdentityUI();
@@ -2310,13 +2045,6 @@
             disconnect();
           } else {
             connect();
-          }
-        });
-        els.serverInput.addEventListener("change", () => {
-          const url = els.serverInput.value.trim();
-          if (url) {
-            state.serverUrl = url;
-            storageSet(STORAGE.server, url);
           }
         });
         els.userName.addEventListener("input", () => {

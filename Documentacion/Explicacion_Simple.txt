@@ -75,8 +75,10 @@ Archivo de respaldo:
   la pizarra en disco. Despues queda esperando conexiones.
 
 4.2 Una laptop se conecta
-  La laptop abre la pagina del cliente y pulsa "Conectar". El cliente
-  abre el canal WebSocket con el servidor.
+  La laptop abre la pagina del cliente y pulsa "Conectar". La direccion
+  del servidor ya esta definida en el codigo del cliente, por lo que no
+  es necesario escribirla manualmente. El cliente abre el canal WebSocket
+  con el servidor.
   El servidor revisa:
   - Que el origen de la pagina este permitido.
   - Que la IP este autorizada, si el modo de acceso es por lista.
@@ -252,11 +254,12 @@ El backend esta completo y probado. Puede:
 - Guardar y recuperar la pizarra.
 - Controlar errores, abusos, limites y desconexiones.
 
-El cliente actual es una version basica. Puede conectarse, dibujar y
-borrar, pero todavia envia el trazo completo al final. Para que el
-usuario vea el trazo apareciendo punto por punto en las demas laptops,
-el frontend debe enviar los avisos de inicio, puntos y fin que el
-servidor ya soporta.
+El cliente actual puede conectarse, dibujar y borrar. La direccion del
+servidor se configura directamente en Client/js/config.js y ya no se
+solicita en la vista. El punto de entrada es Client/app.js; sus piezas
+JavaScript y estilos estan distribuidos en carpetas separadas. El dibujo
+se actualiza localmente mientras se hace y se comparte completo al soltar,
+sin reiniciar ni cortar la conexion.
 
 
 11. RESUMEN EN UNA FRASE

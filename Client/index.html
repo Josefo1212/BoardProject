@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#fff7ed" />
   <title>Pizarra · Dibuja en equipo</title>
   <meta name="description" content="Pizarra colaborativa en tiempo real. Dibuja, borra y comparte con tu equipo." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%236c5ce7'/%3E%3Cpath d='M14 40c7-18 14 10 21-7s14 10 21-7' fill='none' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E" />
 
   <!-- Única dependencia externa: una fuente redondeada -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -174,18 +175,6 @@
       </a>
 
       <div class="connection-bar">
-        <label class="server-field" for="server-url">
-          <svg class="icon" aria-hidden="true"><use href="#i-server" /></svg>
-          <input
-            id="server-url"
-            type="text"
-            value="ws://127.0.0.1:3005"
-            placeholder="ws://127.0.0.1:3005"
-            spellcheck="false"
-            autocomplete="off"
-            aria-label="Dirección del servidor WebSocket"
-          />
-        </label>
         <button id="connect-button" class="btn btn-connect" type="button" aria-label="Conectar al servidor">
           <svg class="icon" id="connect-icon" aria-hidden="true"><use href="#i-plug" /></svg>
           <span id="connect-label">Conectar</span>
@@ -399,6 +388,6 @@
     </div>
   </dialog>
 
-  <script src="./app.js" defer></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>

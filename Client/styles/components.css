@@ -1,0 +1,10 @@
+.connection-bar,
+.userbar,
+.dock {
+  min-width: 0;
+}
+
+.board-card,
+.canvas-shell {
+  contain: layout paint;
+}

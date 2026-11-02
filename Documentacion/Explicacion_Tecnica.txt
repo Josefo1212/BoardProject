@@ -701,7 +701,10 @@ el servidor real.
 
 10. INTEGRACION CON EL CLIENTE
 --------------------------------------------------
-El cliente actual (BoardProject/Client) es básico:
+El cliente actual usa Client/app.js como punto de entrada. Sus módulos
+JavaScript se distribuyen en Client/js/: configuración, estado, referencias
+del DOM, utilidades, lienzo y comunicación. Los estilos se distribuyen en
+Client/styles/, mientras que Client/style.css funciona como punto de entrada:
 - Dibuja localmente.
 - Envía un mensaje stroke completo al soltar el puntero.
 - Envía clear al pulsar Limpiar.
@@ -709,11 +712,14 @@ El cliente actual (BoardProject/Client) es básico:
 - Al recibir stroke dibuja el trazo remoto.
 - Al recibir clear limpia el canvas.
 
-Para aprovechar el tiempo real real, el frontend debe cambiar de enviar
-un solo stroke al final a enviar:
-1. stroke-start al presionar.
-2. stroke-points por lotes mientras se mueve el puntero.
-3. stroke-end al soltar.
+El frontend envia:
+1. Dibuja el trazo localmente mientras se mueve el puntero.
+2. Envia un mensaje `stroke` completo al soltar.
+
+Enviar cada trazo completo evita que una interrupcion durante los mensajes
+fragmentados deje la conexion en un estado inconsistente. La pizarra local
+continua actualizandose en tiempo real y el servidor distribuye cada trazo
+terminado a los demas clientes.
 
 También conviene que el frontend:
 - Use crypto.randomUUID() para strokeId.
@@ -721,6 +727,9 @@ También conviene que el frontend:
 - Escale las coordenadas normalizadas al tamaño actual del canvas.
 - Maneje snapshot, presence, error y server-shutdown.
 - Implemente reconexión con reintento.
+
+La URL del WebSocket se define en codigo usando el host actual y el
+puerto 3005; la vista no muestra ningun campo para editarla.
 
 El servidor ya soporta ambos formatos: el streaming y el stroke completo.
 
