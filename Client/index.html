@@ -1,27 +1,404 @@
 <!doctype html>
-<html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pizarra colaborativa</title>
-    <link rel="stylesheet" href="./src/styles.css" />
-  </head>
-  <body>
-    <main class="app">
-      <header class="toolbar">
-        <h1>Pizarra</h1>
-        <label>
-          Servidor
-          <input id="server-url" value="" placeholder="ws://IP_DEL_SERVIDOR:3005" />
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#fff7ed" />
+  <title>Pizarra · Dibuja en equipo</title>
+  <meta name="description" content="Pizarra colaborativa en tiempo real. Dibuja, borra y comparte con tu equipo." />
+
+  <!-- Única dependencia externa: una fuente redondeada -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="./style.css" />
+
+</head>
+<body>
+  <!-- ============================================================
+       ICONOS SVG INLINE
+       ============================================================ -->
+  <svg width="0" height="0" class="icon-sprite-defs" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="i-brush" viewBox="0 0 24 24">
+        <path d="M14.7 4.3 20 9.6l-7.7 7.7-5.3-5.3 7.7-7.7Z" />
+        <path d="m7 12-2.6 2.6a3.4 3.4 0 0 0 0 4.8 3.4 3.4 0 0 0 4.8 0L12 17" />
+        <path d="m14.7 4.3 1.4-1.4a1.6 1.6 0 0 1 2.3 0l2.7 2.7a1.6 1.6 0 0 1 0 2.3l-1.4 1.4" />
+      </symbol>
+      <symbol id="i-eraser" viewBox="0 0 24 24">
+        <path d="m4.4 14.4 7.2-9.1a2 2 0 0 1 2.8-.2l4.6 3.7a2 2 0 0 1 .3 2.8l-6.2 7.9H6.4a2.7 2.7 0 0 1-2-4.5Z" />
+        <path d="m8.8 7.6 7.7 6.1" />
+        <path d="M9.2 19.5h10.4" />
+      </symbol>
+      <symbol id="i-bucket" viewBox="0 0 24 24">
+        <path d="m5 11 7.5-7.5a1.5 1.5 0 0 1 2.1 0l4.4 4.4a1.5 1.5 0 0 1 0 2.1L11.5 17.5 5 11Z" />
+        <path d="m8 8 8 8" />
+        <path d="M5 11h10" />
+        <path d="M20.5 15.5c.8 1.1 1.3 2 1.3 2.8a1.8 1.8 0 1 1-3.6 0c0-.8.5-1.7 1.3-2.8l.5-.7.5.7Z" />
+      </symbol>
+      <symbol id="i-line" viewBox="0 0 24 24">
+        <path d="m6 18 12-12" />
+        <circle cx="5" cy="19" r="2" />
+        <circle cx="19" cy="5" r="2" />
+      </symbol>
+      <symbol id="i-rect" viewBox="0 0 24 24">
+        <rect x="4" y="5" width="16" height="14" rx="2" />
+      </symbol>
+      <symbol id="i-circle" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" />
+      </symbol>
+      <symbol id="i-undo" viewBox="0 0 24 24">
+        <path d="m9 7-5 4 5 4" />
+        <path d="M4 11h8.2a6.8 6.8 0 1 1 0 13.6" transform="translate(0 -2)" />
+      </symbol>
+      <symbol id="i-redo" viewBox="0 0 24 24">
+        <path d="m15 7 5 4-5 4" />
+        <path d="M20 11h-8.2a6.8 6.8 0 1 0 0 13.6" transform="translate(0 -2)" />
+      </symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24">
+        <path d="M4 7h16" />
+        <path d="M9 7V5h6v2" />
+        <path d="m6 7 1 12.5a1.5 1.5 0 0 0 1.5 1.5h7a1.5 1.5 0 0 0 1.5-1.5L18 7" />
+        <path d="M10 11v6M14 11v6" />
+      </symbol>
+      <symbol id="i-download" viewBox="0 0 24 24">
+        <path d="M12 3v12" />
+        <path d="m7 10 5 5 5-5" />
+        <path d="M4 19.5h16" />
+      </symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24">
+        <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z" />
+      </symbol>
+      <symbol id="i-help" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M9.7 9a2.4 2.4 0 1 1 3.5 2.1c-.8.4-1.2 1-1.2 1.9" />
+        <path d="M12 17h.01" />
+      </symbol>
+      <symbol id="i-users" viewBox="0 0 24 24">
+        <circle cx="9" cy="8" r="3.2" />
+        <path d="M3.5 19.5c.4-3.2 2.5-5.2 5.5-5.2s5.1 2 5.5 5.2" />
+        <path d="M16 5.4a3.2 3.2 0 0 1 0 5.2" />
+        <path d="M17.6 14.6c1.7.6 2.7 2.2 3 4.9" />
+      </symbol>
+      <symbol id="i-plug" viewBox="0 0 24 24">
+        <path d="M9 3v5M15 3v5" />
+        <path d="M6 8h12v3.5A6 6 0 0 1 12 17.5 6 6 0 0 1 6 11.5V8Z" />
+        <path d="M12 17.5V21" />
+      </symbol>
+      <symbol id="i-server" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="7" rx="2" />
+        <rect x="3" y="13" width="18" height="7" rx="2" />
+        <path d="M7 7.5h.01M7 16.5h.01" />
+      </symbol>
+      <symbol id="i-palette" viewBox="0 0 24 24">
+        <path d="M12 3a9 9 0 1 0 0 18c1.6 0 2-1 1.4-2.1-.7-1.3.2-2.9 1.8-2.9H17a4 4 0 0 0 4-4c0-5-4-9-9-9Z" />
+        <circle cx="7.5" cy="10" r="1" />
+        <circle cx="10" cy="6.8" r="1" />
+        <circle cx="14.5" cy="6.8" r="1" />
+        <circle cx="17.3" cy="10" r="1" />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24">
+        <path d="m5 12.5 4.5 4.5L19 7" />
+      </symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24">
+        <path d="m6 9 6 6 6-6" />
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 24 24">
+        <path d="m6 6 12 12M18 6 6 18" />
+      </symbol>
+      <symbol id="i-sparkles" viewBox="0 0 24 24">
+        <path d="M12 2.5c.5 3.8 2.2 5.5 6 6-3.8.5-5.5 2.2-6 6-.5-3.8-2.2-5.5-6-6 3.8-.5 5.5-2.2 6-6Z" />
+        <path d="M19 14.5c.2 1.7 1 2.5 2.7 2.7-1.7.2-2.5 1-2.7 2.7-.2-1.7-1-2.5-2.7-2.7 1.7-.2 2.5-1 2.7-2.7Z" />
+        <path d="M5 14.5c.2 1.7 1 2.5 2.7 2.7C6 17.4 5.2 18.2 5 19.9c-.2-1.7-1-2.5-2.7-2.7 1.7-.2 2.5-1 2.7-2.7Z" />
+      </symbol>
+      <symbol id="i-warning" viewBox="0 0 24 24">
+        <path d="M10.3 4.2 2.6 18a2 2 0 0 0 1.8 3h15.2a2 2 0 0 0 1.8-3L13.7 4.2a2 2 0 0 0-3.4 0Z" />
+        <path d="M12 9v4M12 17h.01" />
+      </symbol>
+      <symbol id="i-info" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 11v5M12 8h.01" />
+      </symbol>
+      <symbol id="i-link-off" viewBox="0 0 24 24">
+        <path d="m4 4 16 16" />
+        <path d="M9.5 14.5 7 17a3.5 3.5 0 0 1-5-5l2.5-2.5" />
+        <path d="M14.5 9.5 17 7a3.5 3.5 0 1 1 5 5l-2.5 2.5" />
+      </symbol>
+    </defs>
+  </svg>
+
+  <!-- Fondo vivo -->
+  <div class="bg" aria-hidden="true">
+    <span class="blob blob-1"></span>
+    <span class="blob blob-2"></span>
+    <span class="blob blob-3"></span>
+    <span class="blob blob-4"></span>
+    <svg class="deco deco-star" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+      <path d="M32 8v16M32 40v16M8 32h16M40 32h16" />
+      <path d="m15 15 11 11M38 38l11 11M49 15 38 26M26 38 15 49" opacity=".55" />
+    </svg>
+    <svg class="deco deco-heart" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M24 40S7 30 7 17.5A9.5 9.5 0 0 1 24 11a9.5 9.5 0 0 1 17 6.5C41 30 24 40 24 40Z" />
+    </svg>
+    <svg class="deco deco-squiggle" viewBox="0 0 160 90" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round">
+      <path d="M12 50c16-42 34 42 52 0s34 42 52 0 20-18 32-10" />
+    </svg>
+    <svg class="deco deco-plus" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round">
+      <path d="M18 5v26M5 18h26" />
+    </svg>
+  </div>
+
+  <div class="app">
+    <!-- ==========================================================
+         CABECERA
+         ========================================================== -->
+    <header class="topbar">
+      <a class="brand" href="#board" aria-label="Pizarra, ir al lienzo">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none">
+            <rect x="2" y="2" width="44" height="44" rx="14" fill="rgba(255,255,255,.16)" stroke="rgba(255,255,255,.55)" stroke-width="1.5" />
+            <path d="M11 31c4.5-12 9 7 13.5-5s9 7 13.5-5" stroke="#fff" stroke-width="4.2" stroke-linecap="round" />
+            <circle cx="14" cy="15" r="2.4" fill="#fff" fill-opacity=".95" />
+            <circle cx="33" cy="14" r="2" fill="#fff" fill-opacity=".7" />
+          </svg>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">Pizarra</span>
+          <span class="brand-tagline">Dibuja en equipo</span>
+        </span>
+      </a>
+
+      <div class="connection-bar">
+        <label class="server-field" for="server-url">
+          <svg class="icon" aria-hidden="true"><use href="#i-server" /></svg>
+          <input
+            id="server-url"
+            type="text"
+            value="ws://127.0.0.1:3005"
+            placeholder="ws://127.0.0.1:3005"
+            spellcheck="false"
+            autocomplete="off"
+            aria-label="Dirección del servidor WebSocket"
+          />
         </label>
-        <button id="connect-button" type="button">Conectar</button>
-        <button id="clear-button" type="button" disabled>Limpiar</button>
-        <span id="status">Desconectado</span>
-      </header>
+        <button id="connect-button" class="btn btn-connect" type="button" aria-label="Conectar al servidor">
+          <svg class="icon" id="connect-icon" aria-hidden="true"><use href="#i-plug" /></svg>
+          <span id="connect-label">Conectar</span>
+        </button>
+        <div class="status-pill is-off" id="status-pill" role="status" aria-live="polite" title="Desconectado">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="status-text">Desconectado</span>
+        </div>
+      </div>
 
-      <canvas id="board" aria-label="Pizarra para dibujar"></canvas>
+      <div class="userbar">
+        <div class="users-pill" id="users-pill" title="Personas conectadas" aria-label="0 personas conectadas">
+          <svg class="icon" aria-hidden="true"><use href="#i-users" /></svg>
+          <span id="user-count">0</span>
+        </div>
+        <label class="name-field" for="user-name" title="Tu nombre">
+          <span class="avatar" id="user-avatar" aria-hidden="true">A</span>
+          <input id="user-name" type="text" maxlength="20" value="Artista" placeholder="Tu nombre" autocomplete="nickname" aria-label="Tu nombre" />
+        </label>
+        <button id="theme-toggle" class="icon-btn" type="button" aria-label="Cambiar a modo oscuro" title="Cambiar tema">
+          <svg class="icon icon-sun" aria-hidden="true"><use href="#i-sun" /></svg>
+          <svg class="icon icon-moon" aria-hidden="true"><use href="#i-moon" /></svg>
+        </button>
+        <button id="help-button" class="icon-btn" type="button" aria-label="Ver atajos y ayuda" title="Ayuda y atajos (?)">
+          <svg class="icon" aria-hidden="true"><use href="#i-help" /></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ==========================================================
+         LIENZO
+         ========================================================== -->
+    <main class="stage" id="stage">
+      <div class="board-holder" id="board-holder">
+        <div class="board-frame" id="board-frame">
+          <div class="board-card">
+            <div class="canvas-shell" id="canvas-shell">
+              <canvas id="board" class="canvas-base" aria-label="Pizarra para dibujar. Usa el mouse, el dedo o el lápiz."></canvas>
+              <canvas id="overlay" class="canvas-live" aria-hidden="true"></canvas>
+
+              <div class="remote-cursors" id="remote-cursors" aria-hidden="true"></div>
+
+              <div class="empty-state" id="empty-state" aria-hidden="true">
+                <svg class="empty-doodle" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 70c10-28 20 9 30-12s20 9 30-12" opacity=".35" />
+                  <path d="M27 42c0-11 9-20 20-20s20 9 20 20" />
+                  <path d="M24 42h46v13a23 23 0 0 1-46 0V42Z" fill="currentColor" fill-opacity=".08" />
+                  <path d="m43 20 3-8 4 7 8-3-3 8" opacity=".75" />
+                  <circle cx="38" cy="49" r="2.2" fill="currentColor" stroke="none" />
+                  <circle cx="58" cy="49" r="2.2" fill="currentColor" stroke="none" />
+                  <path d="M41 58c3 3 7 4 10 4s7-1 10-4" />
+                  <path d="M17 79c3-2 5-2 8 0s5 2 8 0 5-2 8 0 5 2 8 0 5-2 8 0 5 2 8 0 5-2 8 0" opacity=".35" />
+                </svg>
+                <strong>¡Dale vida a este lienzo!</strong>
+                <span>Dibuja con el mouse, el dedo o el lápiz </span>
+              </div>
+
+              <div class="live-badge" id="live-badge" aria-hidden="true">
+                <span class="live-dot"></span>
+                <span id="live-text">Solo local</span>
+              </div>
+
+              <div class="canvas-tip" id="canvas-tip">Conéctate para dibujar en equipo</div>
+
+              <div class="board-actions" role="group" aria-label="Acciones del lienzo">
+                <button id="undo-btn" class="act-btn" type="button" aria-label="Deshacer (Ctrl+Z)" title="Deshacer (Ctrl+Z)" disabled>
+                  <svg class="icon" aria-hidden="true"><use href="#i-undo" /></svg>
+                  <span class="act-label">Deshacer</span>
+                </button>
+                <button id="redo-btn" class="act-btn" type="button" aria-label="Rehacer (Ctrl+Shift+Z)" title="Rehacer (Ctrl+Shift+Z)" disabled>
+                  <svg class="icon" aria-hidden="true"><use href="#i-redo" /></svg>
+                  <span class="act-label">Rehacer</span>
+                </button>
+                <button id="clear-btn" class="act-btn is-danger" type="button" aria-label="Limpiar la pizarra" title="Limpiar pizarra">
+                  <svg class="icon" aria-hidden="true"><use href="#i-trash" /></svg>
+                  <span class="act-label">Limpiar</span>
+                </button>
+                <button id="save-btn" class="act-btn is-save" type="button" aria-label="Guardar el dibujo como PNG" title="Guardar como PNG">
+                  <svg class="icon" aria-hidden="true"><use href="#i-download" /></svg>
+                  <span class="act-label">Guardar</span>
+                </button>
+              </div>
+
+              <div class="cursor-ring" id="cursor-ring" aria-hidden="true"><span class="cursor-core"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
+  </div>
 
-    <script type="module" src="./src/index.js"></script>
-  </body>
+  <!-- ==========================================================
+       BARRA DE HERRAMIENTAS INFERIOR
+       ========================================================== -->
+  <div class="dock" id="dock" role="toolbar" aria-label="Herramientas de dibujo">
+    <div class="dock-row dock-main">
+      <div class="tool-group" role="group" aria-label="Herramientas">
+        <button class="tool-btn is-active" type="button" data-tool="brush" data-tip="Pincel (B)" aria-label="Pincel" aria-pressed="true">
+          <svg class="icon" aria-hidden="true"><use href="#i-brush" /></svg>
+        </button>
+        <button class="tool-btn" type="button" data-tool="eraser" data-tip="Borrador (E)" aria-label="Borrador" aria-pressed="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-eraser" /></svg>
+        </button>
+        <button class="tool-btn" type="button" data-tool="fill" data-tip="Cubeta (G)" aria-label="Cubeta de relleno" aria-pressed="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-bucket" /></svg>
+        </button>
+        <button class="tool-btn" type="button" data-tool="line" data-tip="Línea recta (L)" aria-label="Línea recta" aria-pressed="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-line" /></svg>
+        </button>
+        <button class="tool-btn" type="button" data-tool="rect" data-tip="Rectángulo (R)" aria-label="Rectángulo" aria-pressed="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-rect" /></svg>
+        </button>
+        <button class="tool-btn" type="button" data-tool="circle" data-tip="Círculo (C)" aria-label="Círculo" aria-pressed="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-circle" /></svg>
+        </button>
+      </div>
+
+      <span class="dock-divider" aria-hidden="true"></span>
+
+      <div class="size-control">
+        <span class="size-preview" aria-hidden="true"><span class="size-dot" id="size-dot"></span></span>
+        <label class="sr-only" for="size-slider">Grosor del trazo</label>
+        <input id="size-slider" type="range" min="1" max="80" step="1" value="6" />
+        <output class="size-value" id="size-value" for="size-slider">6</output>
+      </div>
+
+      <button id="size-toggle" class="size-toggle" type="button" aria-label="Cambiar grosor del trazo" aria-expanded="false" title="Grosor">
+        <span class="size-dot" id="size-dot-mobile"></span>
+      </button>
+
+      <button id="color-toggle" class="color-toggle" type="button" aria-label="Abrir paleta de colores" aria-expanded="false" title="Paleta de colores">
+        <span class="current-color-dot" id="current-color-dot"></span>
+        <span>Color</span>
+        <svg class="icon chev" aria-hidden="true"><use href="#i-chevron" /></svg>
+      </button>
+    </div>
+
+    <div class="dock-row palette-row" id="palette-row">
+      <div class="palette" id="palette" role="group" aria-label="Paleta rápida de colores"></div>
+      <div class="palette-extras">
+        <label class="custom-color" title="Elegir un color personalizado">
+          <input id="custom-color" type="color" value="#6c5ce7" aria-label="Color personalizado" />
+          <svg class="icon" aria-hidden="true"><use href="#i-palette" /></svg>
+        </label>
+        <div class="recent-colors" id="recent-colors" role="group" aria-label="Colores recientes"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="size-popover" id="size-popover" role="group" aria-label="Grosor del trazo">
+    <div class="popover-title">Grosor <span id="size-popover-value">6 px</span></div>
+    <div class="size-control">
+      <span class="size-preview" aria-hidden="true"><span class="size-dot" id="size-dot-popover"></span></span>
+      <label class="sr-only" for="size-slider-mobile">Grosor del trazo</label>
+      <input id="size-slider-mobile" type="range" min="1" max="80" step="1" value="6" />
+    </div>
+  </div>
+
+  <!-- ==========================================================
+       TOASTS Y CONFETI
+       ========================================================== -->
+  <div class="toast-stack" id="toast-stack" aria-live="polite" aria-atomic="false"></div>
+  <div class="confetti-layer" id="confetti-layer" aria-hidden="true"></div>
+  <div class="sr-only" id="sr-live" aria-live="polite"></div>
+
+  <!-- ==========================================================
+       MODALES
+       ========================================================== -->
+  <dialog class="modal" id="clear-dialog" aria-labelledby="clear-title">
+    <div class="modal-body">
+      <div class="modal-icon" aria-hidden="true">
+        <svg class="icon"><use href="#i-trash" /></svg>
+      </div>
+      <h2 id="clear-title">¿Borrar toda la pizarra?</h2>
+      <p id="clear-description">Esto eliminará el dibujo de todas las personas conectadas. No se puede deshacer.</p>
+    </div>
+    <div class="modal-actions">
+      <form method="dialog">
+        <button class="btn btn-ghost" value="cancel" type="submit">Cancelar</button>
+      </form>
+      <button class="btn btn-danger" id="confirm-clear" type="button">Sí, borrar</button>
+    </div>
+  </dialog>
+
+  <dialog class="modal" id="help-dialog" aria-labelledby="help-title">
+    <div class="modal-body">
+      <div class="modal-icon is-info" aria-hidden="true">
+        <svg class="icon"><use href="#i-sparkles" /></svg>
+      </div>
+      <h2 id="help-title">Atajos y trucos</h2>
+      <p>Todo lo que necesitas para dibujar sin soltar el lápiz.</p>
+      <div class="shortcuts">
+        <div class="shortcut"><span>Pincel</span><kbd>B</kbd></div>
+        <div class="shortcut"><span>Borrador</span><kbd>E</kbd></div>
+        <div class="shortcut"><span>Cubeta</span><kbd>G</kbd></div>
+        <div class="shortcut"><span>Línea</span><kbd>L</kbd></div>
+        <div class="shortcut"><span>Rectángulo</span><kbd>R</kbd></div>
+        <div class="shortcut"><span>Círculo</span><kbd>C</kbd></div>
+        <div class="shortcut"><span>Grosor</span><kbd>[ ]</kbd></div>
+        <div class="shortcut"><span>Colores 1-9</span><kbd>1…9</kbd></div>
+        <div class="shortcut"><span>Deshacer</span><kbd>Ctrl Z</kbd></div>
+        <div class="shortcut"><span>Rehacer</span><kbd>Ctrl ⇧ Z</kbd></div>
+        <div class="shortcut"><span>Ayuda</span><kbd>?</kbd></div>
+        <div class="shortcut"><span>Cerrar</span><kbd>Esc</kbd></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <form method="dialog" class="modal-form">
+        <button class="btn btn-violet" type="submit">¡A dibujar!</button>
+      </form>
+    </div>
+  </dialog>
+
+  <script src="./app.js" defer></script>
+</body>
 </html>
