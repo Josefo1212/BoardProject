@@ -53,7 +53,8 @@ export class Communication {
     this.#maxMessagesPerSecond = limits.maxMessagesPerSecond;
     this.#persistence = persistence;
 
-    this.#loadPersistedBoard();
+    // Sin memoria persistida entre sesiones
+    // this.#loadPersistedBoard();
 
     this.#server = new WebSocketServer({
       host: server.host,
@@ -104,11 +105,12 @@ export class Communication {
       this.#persistTimer = null;
     }
 
-    try {
-      await this.#flushPersistence();
-    } catch (error) {
-      console.error("[Board] No se pudo guardar la pizarra al cerrar:", error.message);
-    }
+    // No guardar en disco
+    // try {
+    //   await this.#flushPersistence();
+    // } catch (error) {
+    //   console.error("[Board] No se pudo guardar la pizarra al cerrar:", error.message);
+    // }
 
     for (const client of this.#clients) {
       this.#sendJson(client.socket, {
@@ -119,6 +121,8 @@ export class Communication {
     }
 
     this.#clients.clear();
+    this.#strokes.clear();
+    this.#totalPoints = 0;
 
     await new Promise((resolve) => {
       const timer = setTimeout(resolve, 3_000);
@@ -219,6 +223,22 @@ export class Communication {
 
     console.log(`[WS] Cliente desconectado: id=${client.id}`);
 
+    // Si no quedan clientes, limpiar todo (sin memoria entre sesiones)
+    if (this.#clients.size === 0) {
+      this.#strokes.clear();
+      this.#totalPoints = 0;
+      // Limpiar archivo de persistencia si existe
+      if (this.#persistence?.enabled && this.#persistence?.file) {
+        try {
+          fs.unlinkSync(this.#persistence.file);
+        } catch {}
+        try {
+          fs.unlinkSync(`${this.#persistence.file}.tmp`);
+        } catch {}
+      }
+      return;
+    }
+
     if (!this.#closed) {
       this.#broadcast({ type: "presence", clients: this.#clients.size });
     }
@@ -258,9 +278,10 @@ export class Communication {
         this.#broadcast(result.broadcast, client.socket);
       }
 
-      if (result.persist) {
-        this.#schedulePersist();
-      }
+      // No guardar en disco
+      // if (result.persist) {
+      //   this.#schedulePersist();
+      // }
     } catch (error) {
       const code = error instanceof ProtocolError ? error.code : "INVALID_MESSAGE";
       const errorMessage = error instanceof Error ? error.message : "Mensaje inválido.";
@@ -467,9 +488,19 @@ export class Communication {
       connectedClient.strokeIds.clear();
     }
 
+    // Borrar archivo de persistencia si existe
+    if (this.#persistence?.enabled && this.#persistence?.file) {
+      try {
+        fs.unlinkSync(this.#persistence.file);
+      } catch {}
+      try {
+        fs.unlinkSync(`${this.#persistence.file}.tmp`);
+      } catch {}
+    }
+
     return {
       broadcast: { type: "clear", authorId: client.id },
-      persist: true,
+      persist: false,
     };
   }
 

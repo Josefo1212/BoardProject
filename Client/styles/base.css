@@ -1152,6 +1152,29 @@
       min-height: 50px;
     }
 
+    .palette-row {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: calc(100% + 9px);
+      display: none;
+      gap: 12px;
+      margin: 0;
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--glass-strong);
+      box-shadow: var(--shadow-md);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      animation: pop-in 0.24s var(--spring);
+    }
+
+    .dock.is-palette-open .palette-row {
+      display: flex;
+      flex-wrap: wrap;
+    }
+
     .tool-group {
       display: flex;
       align-items: center;
@@ -1344,7 +1367,6 @@
 
     .color-toggle,
     .size-toggle {
-      display: none;
       align-items: center;
       justify-content: center;
       gap: 6px;
@@ -1356,6 +1378,14 @@
       color: var(--ink-soft);
       font-size: 12px;
       font-weight: 650;
+    }
+
+    .color-toggle {
+      display: inline-flex;
+    }
+
+    .size-toggle {
+      display: none;
     }
 
     .color-toggle {
@@ -1394,13 +1424,6 @@
     .size-toggle .size-dot {
       width: 10px;
       height: 10px;
-    }
-
-    .palette-row {
-      gap: 12px;
-      margin-top: 7px;
-      padding-top: 7px;
-      border-top: 1px solid var(--line);
     }
 
     .palette {
@@ -1894,28 +1917,6 @@
       .size-toggle,
       .color-toggle {
         display: inline-flex;
-      }
-
-      .palette-row {
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: calc(100% + 9px);
-        display: none;
-        margin: 0;
-        padding: 11px;
-        border: 1px solid var(--line);
-        border-radius: 20px;
-        background: var(--glass-strong);
-        box-shadow: var(--shadow-md);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        animation: pop-in 0.24s var(--spring);
-      }
-
-      .dock.is-palette-open .palette-row {
-        display: flex;
-        flex-wrap: wrap;
       }
 
       .palette {

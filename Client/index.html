@@ -270,7 +270,18 @@
        BARRA DE HERRAMIENTAS INFERIOR
        ========================================================== -->
   <div class="dock" id="dock" role="toolbar" aria-label="Herramientas de dibujo">
-    <div class="dock-row dock-main">
+    <div class="dock-row palette-row" id="palette-row" aria-label="Colores">
+      <div class="palette" id="palette" role="group" aria-label="Paleta rápida de colores"></div>
+      <div class="palette-extras">
+        <label class="custom-color" title="Elegir un color personalizado">
+          <input id="custom-color" type="color" value="#6c5ce7" aria-label="Color personalizado" />
+          <svg class="icon" aria-hidden="true"><use href="#i-palette" /></svg>
+        </label>
+        <div class="recent-colors" id="recent-colors" role="group" aria-label="Colores recientes"></div>
+      </div>
+    </div>
+
+    <div class="dock-row dock-main" aria-label="Herramientas y grosor">
       <div class="tool-group" role="group" aria-label="Herramientas">
         <button class="tool-btn is-active" type="button" data-tool="brush" data-tip="Pincel (B)" aria-label="Pincel" aria-pressed="true">
           <svg class="icon" aria-hidden="true"><use href="#i-brush" /></svg>
@@ -311,19 +322,7 @@
         <svg class="icon chev" aria-hidden="true"><use href="#i-chevron" /></svg>
       </button>
     </div>
-
-    <div class="dock-row palette-row" id="palette-row">
-      <div class="palette" id="palette" role="group" aria-label="Paleta rápida de colores"></div>
-      <div class="palette-extras">
-        <label class="custom-color" title="Elegir un color personalizado">
-          <input id="custom-color" type="color" value="#6c5ce7" aria-label="Color personalizado" />
-          <svg class="icon" aria-hidden="true"><use href="#i-palette" /></svg>
-        </label>
-        <div class="recent-colors" id="recent-colors" role="group" aria-label="Colores recientes"></div>
-      </div>
-    </div>
   </div>
-
   <div class="size-popover" id="size-popover" role="group" aria-label="Grosor del trazo">
     <div class="popover-title">Grosor <span id="size-popover-value">6 px</span></div>
     <div class="size-control">

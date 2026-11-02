@@ -40,7 +40,6 @@ export const els = {
   dock: $("#dock"),
   colorToggle: $("#color-toggle"),
   currentColorDot: $("#current-color-dot"),
-  paletteRow: $("#palette-row"),
   palette: $("#palette"),
   customColor: $("#custom-color"),
   recentColors: $("#recent-colors"),

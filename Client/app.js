@@ -19,7 +19,6 @@
       cloneStroke,
       debounce,
       hexToRgb,
-      isHexColor,
       isLightColor,
       normalizeHex,
       safeParse,
@@ -30,30 +29,11 @@
 
     "use strict";
 
-    /* ============================================================
-       PIZARRA · CLIENTE
-       Organización:
-       1. Estado y constantes
-       2. Utilidades y persistencia
-       3. Interfaz y notificaciones
-       4. Lienzo y motor de dibujo
-       5. Red WebSocket
-       6. Arranque
-       ============================================================ */
-
     (() => {
-      /* ============================================================
-         1. ESTADO Y CONSTANTES
-         ============================================================ */
-
       const board = new Board({ base: els.base, overlay: els.overlay });
       const baseCtx = board.baseContext;
       const liveCtx = board.overlayContext;
       const communication = new Communication();
-
-      /* ============================================================
-         2. UTILIDADES Y PERSISTENCIA
-         ============================================================ */
 
       const roundPoint = (value) => Number(value.toFixed(5));
 
@@ -96,10 +76,6 @@
         storageSet(STORAGE.recents, JSON.stringify(state.recentColors));
         renderRecentColors();
       }
-
-      /* ============================================================
-         3. TEMA, PALETA Y CONTROLES
-         ============================================================ */
 
       const applyTheme = (theme, persist = true) => {
         state.theme = theme === "dark" ? "dark" : "light";
@@ -213,7 +189,6 @@
         closeMobileColorPanel();
         closeSizePopover();
 
-        // Pequeño rebote visual al cambiar de herramienta.
         const activeButton = els.toolButtons.find((button) => button.dataset.tool === tool);
         if (activeButton) {
           activeButton.animate(
@@ -287,10 +262,6 @@
         document.title = `Pizarra · ${name}`;
       }
 
-      /* ============================================================
-         4. MEDIDAS DEL LIENZO
-         ============================================================ */
-
       const layoutBoard = () => {
         const rect = els.boardHolder.getBoundingClientRect();
         const styles = getComputedStyle(els.root);
@@ -299,7 +270,6 @@
 
         if (rect.width < 10 || rect.height < 10) return;
 
-        // El área de dibujo siempre mantiene 4:3 para que todos vean lo mismo.
         const availableW = Math.max(160, rect.width - pad * 2);
         const availableH = Math.max(120, rect.height - pad * 2);
         let innerW = Math.min(availableW, availableH * (4 / 3), maxCanvasWidth);
@@ -318,12 +288,7 @@
         });
       }
 
-      // Se completan más abajo, en el motor de dibujo.
       let resizeCanvases = () => {};
-
-      /* ============================================================
-         4. MOTOR DE DIBUJO
-         ============================================================ */
 
       const remoteCursorEls = new Map();
 
@@ -421,10 +386,6 @@
         return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
       }
 
-      /**
-       * Dibuja un trazo completo en el contexto indicado.
-       * Usa curvas cuadráticas entre puntos medios: extremos suaves, sin picos.
-       */
       const drawStroke = (ctx, stroke, pointsOverride = null) => {
         const points = pointsOverride || stroke?.points;
         if (!Array.isArray(points) || points.length === 0) return;
@@ -475,7 +436,6 @@
         const hasPressure = points.some((point) => Number.isFinite(point.pressure));
 
         if (!hasPressure) {
-          // Un solo path: más rápido y perfectamente suave.
           ctx.beginPath();
           ctx.moveTo(pts[0].x, pts[0].y);
           if (pts.length === 2) {
@@ -493,7 +453,6 @@
           ctx.lineWidth = baseWidth;
           ctx.stroke();
         } else {
-          // Con lápiz/stylus variamos el grosor por segmento según la presión.
           for (let i = 1; i < pts.length; i += 1) {
             const start = i === 1 ? pts[0] : midpoint(pts[i - 2], pts[i - 1]);
             const control = pts[i - 1];
@@ -555,7 +514,6 @@
         });
       }
 
-      /** Aplica un trazo ya confirmado al canvas base. */
       const renderStrokeToBase = (stroke) => {
         const info = parseStyle(stroke?.style);
         if (info.type === "fill") {
@@ -566,10 +524,6 @@
         if (info.type === "command") return;
         drawStroke(baseCtx, stroke);
       }
-
-      /* ------------------------------------------------------------
-         Cubeta de relleno (scanline flood fill)
-         ------------------------------------------------------------ */
 
       const floodFill = (ctx, nx, ny, colorHex) => {
         const w = ctx.canvas.width;
@@ -658,10 +612,6 @@
         return true;
       }
 
-      /* ------------------------------------------------------------
-         Borrador incremental
-         ------------------------------------------------------------ */
-
       const eraseDot = (point, width) => {
         const x = clamp(point.x, 0, 1) * state.viewW;
         const y = clamp(point.y, 0, 1) * state.viewH;
@@ -714,10 +664,6 @@
         }
       }
 
-      /* ------------------------------------------------------------
-         Altas de trazos
-         ------------------------------------------------------------ */
-
       const updateArtUI = () => {
         const hasArt =
           state.strokes.size > 0 ||
@@ -765,10 +711,6 @@
         state.offlineQueue.push(cloneStroke(stroke));
         if (state.offlineQueue.length > 500) state.offlineQueue.shift();
       }
-
-      /* ------------------------------------------------------------
-         Entrada del puntero
-         ------------------------------------------------------------ */
 
       const pointFromClient = (clientX, clientY, pressure, pointerType) => {
         const rect = els.canvasShell.getBoundingClientRect();
@@ -889,7 +831,6 @@
           ];
         }
 
-        // Círculo/elipse dentro del rectángulo que forma el arrastre.
         const cx = (start.x + end.x) / 2;
         const cy = (start.y + end.y) / 2;
         const rx = Math.abs(end.x - start.x) / 2;
@@ -918,9 +859,7 @@
 
         try {
           els.base.setPointerCapture(event.pointerId);
-        } catch {
-          /* ignore */
-        }
+        } catch {}
 
         if (state.tool === "fill") {
           finishFillAt(point);
@@ -1023,9 +962,7 @@
           if (els.base.hasPointerCapture?.(active.pointerId)) {
             els.base.releasePointerCapture(active.pointerId);
           }
-        } catch {
-          /* ignore */
-        }
+        } catch {}
 
         if (active.kind === "shape") {
           const points = active.preview || shapePoints(active.shape, active.start, active.current);
@@ -1092,18 +1029,11 @@
           if (els.base.hasPointerCapture?.(active.pointerId)) {
             els.base.releasePointerCapture(active.pointerId);
           }
-        } catch {
-          /* ignore */
-        }
-        // Si era un borrador ya aplicado, redibujamos para restaurar el contenido.
+        } catch {}
         redrawBase();
         redrawLive();
         updateArtUI();
       }
-
-      /* ------------------------------------------------------------
-         Cubeta
-         ------------------------------------------------------------ */
 
       const finishFillAt = (point) => {
         const changed = floodFill(baseCtx, point.x, point.y, state.color);
@@ -1131,10 +1061,6 @@
           });
         }
       }
-
-      /* ------------------------------------------------------------
-         Deshacer / rehacer
-         ------------------------------------------------------------ */
 
       const sendUndoCommand = (targetId) => {
         const color = `cmd:undo:${targetId}`;
@@ -1225,10 +1151,6 @@
         redrawLive();
         updateArtUI();
       }
-
-      /* ------------------------------------------------------------
-         Limpiar y guardar
-         ------------------------------------------------------------ */
 
       const clearBoardFromServer = (message) => {
         cancelLocalStroke();
@@ -1321,10 +1243,6 @@
         }
       }
 
-      /* ============================================================
-         5. INTERFAZ: TOASTS, CONFETI Y CURSOR
-         ============================================================ */
-
       const showToast = (type, message, options = {}) => {
         const toast = document.createElement("div");
         toast.className = `toast is-${type}`;
@@ -1413,10 +1331,6 @@
         ring.classList.add("is-visible");
       }
 
-      /* ============================================================
-         6. RED WEBSOCKET
-         ============================================================ */
-
       const setStatus = (status, text) => {
         state.status = status;
         els.statusPill.classList.remove("is-connected", "is-connecting", "is-reconnecting", "is-off");
@@ -1487,7 +1401,6 @@
         state.active.clear();
         state.redoStack = [];
         state.undoStack = [];
-        // La cola offline se conserva: se enviará justo después del snapshot.
         clearRemoteCursors();
         redrawBase();
         redrawLive();
@@ -1505,8 +1418,6 @@
           stroke.authorId = state.clientId || "local";
           stroke.complete = true;
 
-          // Si el servidor conserva un trazo incompleto de la conexión anterior
-          // con el mismo ID, no podemos reutilizarlo: pertenece a otro cliente.
           const existing = state.strokes.get(stroke.strokeId) || state.active.get(stroke.strokeId);
           if (existing && existing.authorId !== state.clientId) {
             state.strokes.delete(stroke.strokeId);
@@ -1539,14 +1450,12 @@
       }
 
       const sendHello = () => {
-        // Solo se envía si el servidor anuncia soporte para nombres.
         if (!connected() || !hasFeature("names")) return;
         const name = state.userName.trim() || "Artista";
         sendJson({ type: "hello", name, color: state.color });
       }
 
       const sendCursor = (point, visible = true) => {
-        // Función opcional: el servidor actual no anuncia "cursors".
         if (!connected() || !hasFeature("cursors")) return;
         const now = performance.now();
         if (visible && now - state.lastCursorSend < CURSOR_THROTTLE_MS) return;
@@ -1633,7 +1542,6 @@
               };
               if (!stroke.points.length || typeof stroke.strokeId !== "string") continue;
 
-              // Los comandos de deshacer también llegan dentro del snapshot.
               if (parseStyle(stroke.style).type === "command") {
                 const targetId = String(stroke.style.color || "").slice("cmd:undo:".length);
                 const target = state.strokes.get(targetId);
@@ -1650,7 +1558,6 @@
               }
             }
             redrawBase();
-            // Los borradores en curso también deben aplicarse al lienzo base.
             for (const activeStroke of state.active.values()) {
               if (parseStyle(activeStroke.style).eraser) {
                 applyEraserFrom(activeStroke, 0);
@@ -1948,7 +1855,6 @@
 
         communication.disconnect();
 
-        // Invalida los eventos pendientes del socket anterior.
         state.socket = null;
         state.socketGeneration += 1;
         state.reconnectAttempts = 0;
@@ -1959,13 +1865,11 @@
         showToast("info", "Desconectado. Puedes seguir dibujando en local.", { duration: 2800 });
       }
 
-      /* ============================================================
-         7. EVENTOS DE UI
-         ============================================================ */
-
       const closeMobileColorPanel = () => {
         els.dock.classList.remove("is-palette-open");
         els.colorToggle.setAttribute("aria-expanded", "false");
+        els.colorToggle.setAttribute("aria-label", "Abrir paleta de colores");
+        els.colorToggle.setAttribute("title", "Paleta de colores");
       }
 
       const closeSizePopover = () => {
@@ -1973,13 +1877,35 @@
         els.sizeToggle.setAttribute("aria-expanded", "false");
       }
 
-      /* ============================================================
-         8. ARRANQUE
-         ============================================================ */
-
       const init = () => {
         if (state.initialized) return;
         state.initialized = true;
+
+        document.addEventListener("submit", (e) => {
+          const form = e.target;
+          if (form && form instanceof HTMLFormElement) {
+            if (form.getAttribute("method") === "dialog") {
+              return;
+            }
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }, true);
+
+        document.addEventListener("selectstart", (e) => {
+          if (state.pointerId !== null) {
+            e.preventDefault();
+          }
+        }, true);
+
+        els.canvasShell.addEventListener("contextmenu", (e) => {
+          if (e.target === els.base || e.target === els.overlay) {
+            e.preventDefault();
+          }
+        });
+
+        els.base.addEventListener("dragstart", (e) => e.preventDefault());
+        els.overlay.addEventListener("dragstart", (e) => e.preventDefault());
 
         readStoredPreferences();
         applyTheme(state.theme, false);
@@ -1996,14 +1922,12 @@
         scheduleLayout();
         resizeCanvases();
 
-        // Eventos de herramientas
         els.toolButtons.forEach((btn) => {
           btn.addEventListener("click", () => {
             setTool(btn.dataset.tool);
           });
         });
 
-        // Tamaño
         const onSize = (e) => setSize(e.target.value, { save: false });
         const onSizeCommitted = (e) => setSize(e.target.value, { save: true });
         els.sizeSlider.addEventListener("input", onSize);
@@ -2011,7 +1935,6 @@
         els.sizeSlider.addEventListener("change", onSizeCommitted);
         els.sizeSliderMobile.addEventListener("change", onSizeCommitted);
 
-        // Color
         els.customColor.addEventListener("input", (e) => {
           selectColor(e.target.value, { remember: false });
         });
@@ -2021,6 +1944,8 @@
         els.colorToggle.addEventListener("click", () => {
           const open = els.dock.classList.toggle("is-palette-open");
           els.colorToggle.setAttribute("aria-expanded", open ? "true" : "false");
+          els.colorToggle.setAttribute("aria-label", open ? "Cerrar paleta de colores" : "Abrir paleta de colores");
+          els.colorToggle.setAttribute("title", open ? "Cerrar paleta de colores" : "Paleta de colores");
           closeSizePopover();
         });
         els.sizeToggle.addEventListener("click", () => {
@@ -2037,7 +1962,6 @@
           }
         });
 
-        // Cabecera
         els.themeToggle.addEventListener("click", toggleTheme);
         els.helpButton.addEventListener("click", () => els.helpDialog.showModal());
         els.connectButton.addEventListener("click", () => {
@@ -2054,7 +1978,6 @@
           announceNameLater();
         });
 
-        // Acciones
         els.undoButton.addEventListener("click", undo);
         els.redoButton.addEventListener("click", redo);
         els.clearButton.addEventListener("click", requestClear);
@@ -2064,9 +1987,8 @@
         });
         els.saveButton.addEventListener("click", savePng);
 
-        // Puntero
         els.canvasShell.addEventListener("pointerdown", (e) => {
-          if (e.target !== els.base) return; // ignora la barra de acciones y otros controles
+          if (e.target !== els.base) return;
           if (e.pointerType === "mouse" && e.button !== 0) return;
           if (state.pointerId !== null) return;
           e.preventDefault();
@@ -2076,6 +1998,9 @@
           updateCursorAppearance();
         });
         els.canvasShell.addEventListener("pointermove", (e) => {
+          if (state.pointerId !== null && e.target === els.base) {
+            e.preventDefault();
+          }
           state.hoverPointerType = e.pointerType;
           const ring = els.cursorRing;
           const rect = els.canvasShell.getBoundingClientRect();
@@ -2089,14 +2014,25 @@
           updateCursorAppearance();
         });
         els.canvasShell.addEventListener("pointerup", (e) => {
+          if (e.target === els.base || e.target === els.overlay) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
           if (state.pointerId === e.pointerId) finishLocalStroke();
           updateCursorAppearance();
         });
         els.canvasShell.addEventListener("pointercancel", (e) => {
+          if (e.target === els.base || e.target === els.overlay) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
           if (state.pointerId === e.pointerId) cancelLocalStroke();
           updateCursorAppearance();
         });
         els.canvasShell.addEventListener("pointerleave", () => {
+          if (state.pointerId !== null) {
+            cancelLocalStroke();
+          }
           state.cursorVisible = false;
           els.cursorRing.classList.remove("is-visible");
           if (state.lastCursorPoint) sendCursor(state.lastCursorPoint, false);
@@ -2106,7 +2042,6 @@
           updateCursorAppearance();
         });
 
-        // Atajos
         document.addEventListener("keydown", (e) => {
           if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) {
             if (e.key === "Escape") e.target.blur();
@@ -2166,4 +2101,3 @@
         init();
       }
     })();
-  
