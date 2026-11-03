@@ -7,11 +7,14 @@ server:
   maxBufferedBytes: 8388608
 
 access:
-  mode: "open"
+  mode: "allowlist"
   allowedOrigins:
     - "*"
   allowedIps:
-    - "192.168.100.21"
+    # IP de esta laptop (servidor) en la red WiFi actual.
+    - "192.168.137.50"
+    # Agrega aqui la IP de cada equipo autorizado, por ejemplo:
+    - "192.168.137.51"
 
 limits:
   maxStrokes: 5000

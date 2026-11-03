@@ -758,6 +758,15 @@ Abrir desde cada laptop:
 Ejemplo de IP local detectada: 192.168.4.51
 La IP puede cambiar según la red WiFi.
 
+Si access.mode es "allowlist", agrega la IP de cada equipo autorizado en
+access.allowedIps dentro de Server/config.yaml. La IP del equipo cliente
+es la IP que el servidor registra en el mensaje de rechazo.
+
+El cliente usa automaticamente el mismo host de la pagina para el WebSocket.
+Si la pagina se abre como archivo local o se necesita indicar otra direccion,
+se puede usar:
+  http://IP_DEL_SERVIDOR:8080/?server=ws://IP_DEL_SERVIDOR:3005
+
 Persistencia:
   Server/data/board.json (ignorado por git)
 

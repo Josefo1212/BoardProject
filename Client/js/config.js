@@ -1,4 +1,7 @@
-export const SERVER_URL = `ws://${window.location.hostname || "127.0.0.1"}:3005`;
+const configuredServer = new URLSearchParams(window.location.search).get("server")?.trim();
+const pageHost = window.location.hostname || "127.0.0.1";
+
+export const SERVER_URL = configuredServer || `ws://${pageHost}:3005`;
 
 export const STORAGE = {
   name: "pizarra.name.v1",
