@@ -11,6 +11,7 @@
       POINT_BATCH_MS,
       REFERENCE_WIDTH,
       SERVER_URL,
+      SERVER_URL_HINT,
       STORAGE,
       TOOL_NAMES,
     } from "./js/config.js";
@@ -1760,7 +1761,7 @@
 
         const url = normalizeServerUrl(SERVER_URL);
         if (!url) {
-          showToast("warning", "La dirección del servidor no es válida.", { duration: 3600 });
+          showToast("warning", SERVER_URL_HINT, { duration: 7000 });
           setStatus("disconnected", "Desconectado");
           return;
         }
@@ -1811,8 +1812,8 @@
               if (!opened && !state.everConnected) {
                 setStatus("disconnected", "Desconectado");
                 if (event.code === 1006) {
-                  showToast("error", "No se pudo conectar. ¿Está encendido el servidor?", {
-                    duration: 4400,
+                  showToast("error", "No se pudo conectar. Revisa que el servidor esté encendido y el puerto 3005 abierto en su firewall.", {
+                    duration: 5200,
                   });
                 } else if (event.code === 1013) {
                   showToast("error", "El servidor está lleno. Inténtalo de nuevo en un momento.", {
@@ -1825,8 +1826,8 @@
               }
 
               if (event.code === 1006) {
-                showToast("error", "Se perdió la conexión. ¿Está encendido el servidor?", {
-                  duration: 4200,
+                showToast("error", "Se perdió la conexión. Revisa que el servidor siga encendido y accesible en la red WiFi.", {
+                  duration: 4600,
                 });
               } else if (event.code === 1001) {
                 showToast("warning", "El servidor se está apagando. Intentando reconectar...", {

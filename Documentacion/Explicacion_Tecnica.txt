@@ -744,28 +744,46 @@ Backend:
 Servidor esperado:
   ws://0.0.0.0:3005
 
-Abrir firewall (PowerShell administrador):
-  New-NetFirewallRule -DisplayName "Pizarra WebSocket 3005" -Direction Inbound -Protocol TCP -LocalPort 3005 -Action Allow
+Abrir firewall en la laptop del servidor (IMPRESCINDIBLE):
+  Linux con ufw:
+    sudo ufw allow 3005/tcp
+    sudo ufw reload
+  Windows (PowerShell administrador):
+    New-NetFirewallRule -DisplayName "Pizarra WebSocket 3005" -Direction Inbound -Protocol TCP -LocalPort 3005 -Action Allow
 
-Frontend estático (otra terminal):
-  cd BoardProject\Client
-  python -m http.server 8080 --bind 0.0.0.0
+  Nota: el puerto 5500 (Live Server) solo se abre si las demas laptops
+  entran al Live Server de la laptop del servidor. En el modo elegido cada
+  laptop usa su propio Live Server, asi que 5500 no necesita abrirse.
 
-Abrir desde cada laptop:
-  http://IP_DEL_SERVIDOR:8080
-  Servidor WebSocket: ws://IP_DEL_SERVIDOR:3005
+Ver la IP del servidor en la red WiFi:
+  Linux: ip -brief addr   (usar la IP de wlan0, p. ej. 10.150.169.177)
+  Windows: ipconfig        (usar la IPv4 de la interfaz WiFi)
 
-Ejemplo de IP local detectada: 192.168.4.51
-La IP puede cambiar según la red WiFi.
+Frontend con Live Server (reemplaza a python3 -m http.server):
+  Modo elegido: cada laptop abre su propio Live Server.
+    1. En la laptop del servidor: cd BoardProject/Server && pnpm start
+    2. En CADA laptop: abrir Client/index.html con Live Server
+       (http://127.0.0.1:5500)
+    3. En Client/js/config.js, SERVER_HOST debe tener la IP de la laptop
+       del servidor. Ya viene configurado con 10.150.169.177.
+    4. Si cambia la IP del servidor, actualiza solo esa linea y recarga.
+
+  Alternativa sin tocar codigo, en la barra de direcciones:
+    http://127.0.0.1:5500/?server=ws://IP_DEL_SERVIDOR:3005
+
+  Modo alternativo (Live Server solo en la laptop del servidor):
+    - Configura "liveServer.settings.host": "0.0.0.0" (por defecto Live
+      Server escucha solo en 127.0.0.1 y las demas laptops no lo ven).
+    - Las demas abren http://IP_DEL_SERVIDOR:5500 y el cliente deduce
+      la IP del servidor del host de la pagina.
+
+La IP puede cambiar según la red WiFi: si cambia, actualiza SERVER_HOST.
 
 Si access.mode es "allowlist", agrega la IP de cada equipo autorizado en
 access.allowedIps dentro de Server/config.yaml. La IP del equipo cliente
-es la IP que el servidor registra en el mensaje de rechazo.
-
-El cliente usa automaticamente el mismo host de la pagina para el WebSocket.
-Si la pagina se abre como archivo local o se necesita indicar otra direccion,
-se puede usar:
-  http://IP_DEL_SERVIDOR:8080/?server=ws://IP_DEL_SERVIDOR:3005
+es la IP que el servidor registra en el mensaje de rechazo. Si las IPs
+cambian por DHCP es facil que una laptop quede bloqueada con codigo 1008;
+para una pizarra de aula conviene access.mode: "open".
 
 Persistencia:
   Server/data/board.json (ignorado por git)

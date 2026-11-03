@@ -1,7 +1,31 @@
-const configuredServer = new URLSearchParams(window.location.search).get("server")?.trim();
-const pageHost = window.location.hostname || "127.0.0.1";
+const params = new URLSearchParams(window.location.search);
+const configuredServer = params.get("server")?.trim();
+const pageHost = window.location.hostname;
+const localHosts = new Set(["", "localhost", "127.0.0.1", "::1", "[::1]"]);
+const isLocalPage = localHosts.has(pageHost.toLowerCase());
 
-export const SERVER_URL = configuredServer || `ws://${pageHost}:3005`;
+// IP o nombre de la laptop que ejecuta el servidor WebSocket (pnpm start).
+//
+// Modo elegido: cada laptop abre su propio Live Server (http://127.0.0.1:5500),
+// por eso el navegador no puede deducir la IP del servidor y hay que ponerla
+// aqui. Solo se cambia esta linea cuando cambie la IP de la laptop servidor.
+//
+// Si la pagina se abre desde la laptop del servidor (http://IP_DEL_SERVIDOR:5500)
+// puedes dejar esto vacio y se usara el host de la pagina automaticamente.
+//
+// Ver la IP del servidor:  ip -brief addr  (Linux)  |  ipconfig  (Windows)
+// Sobreescribir sin tocar codigo:
+//   http://127.0.0.1:5500/?server=ws://IP_DEL_SERVIDOR:3005
+export const SERVER_HOST = "10.150.169.177";
+
+// Si la pagina corre en el propio localhost de cada laptop no sirve como
+// referencia: sin SERVER_HOST no hay a donde conectarse.
+const host = SERVER_HOST.trim() || (isLocalPage ? "" : pageHost);
+
+export const SERVER_URL = configuredServer || (host ? `ws://${host}:3005` : "");
+
+export const SERVER_URL_HINT =
+  "Edita SERVER_HOST en Client/js/config.js con la IP de la laptop del servidor, o agrega ?server=ws://IP_DEL_SERVIDOR:3005 a la URL.";
 
 export const STORAGE = {
   name: "pizarra.name.v1",

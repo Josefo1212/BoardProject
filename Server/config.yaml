@@ -7,14 +7,14 @@ server:
   maxBufferedBytes: 8388608
 
 access:
-  mode: "allowlist"
+  # "open" deja entrar a cualquier equipo de la misma red WiFi.
+  # Usa "allowlist" solo si vas a mantener al dia la lista de IPs; si la IP
+  # del router cambia (DHCP), las laptops quedan bloqueadas con codigo 1008.
+  mode: "open"
   allowedOrigins:
     - "*"
-  allowedIps:
-    # IP de esta laptop (servidor) en la red WiFi actual.
-    - "192.168.137.50"
-    # Agrega aqui la IP de cada equipo autorizado, por ejemplo:
-    - "192.168.137.51"
+  # Solo se usan cuando mode es "allowlist". 127.0.0.1 y ::1 siempre se permiten.
+  allowedIps: []
 
 limits:
   maxStrokes: 5000
