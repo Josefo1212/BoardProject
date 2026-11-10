@@ -1743,6 +1743,7 @@
         if (url.protocol === "https:") url.protocol = "wss:";
         if (url.protocol !== "ws:" && url.protocol !== "wss:") return null;
         if (!url.hostname) return null;
+        if (url.pathname === "/" || url.pathname === "") url.pathname = "/board";
         return url.toString();
       }
 

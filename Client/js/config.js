@@ -30,14 +30,14 @@ const autoHost = (() => {
   // Servido por el propio servidor de la pizarra: mismo host y puerto.
   // En Render, el proxy publica el servicio en HTTPS/WSS sin exponer el
   // puerto interno asignado mediante PORT.
-  if (pagePort === "3005" || pagePort === "") return window.location.host;
+  if (pagePort === "3005" || pagePort === "") return `${window.location.host}/board`;
   // Servido desde otra máquina de la red: apunta al puerto del WebSocket.
-  if (!isLocalPage) return `${pageHost}:3005`;
+  if (!isLocalPage) return `${pageHost}:3005/board`;
   return "";
 })();
 
 const manualHost = SERVER_HOST.trim();
-const host = manualHost ? `${manualHost}:3005` : autoHost;
+const host = manualHost ? `${manualHost}:3005/board` : autoHost;
 
 export const SERVER_URL = configuredServer || (host ? `${wsProtocol}//${host}` : "");
 
