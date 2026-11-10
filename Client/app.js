@@ -4,6 +4,7 @@
     import { state } from "./js/state.js";
     import {
       CURSOR_THROTTLE_MS,
+      ICE_SERVERS,
       MAX_WIDTH,
       MIN_WIDTH,
       PALETTE,
@@ -34,7 +35,7 @@
       const board = new Board({ base: els.base, overlay: els.overlay });
       const baseCtx = board.baseContext;
       const liveCtx = board.overlayContext;
-      const communication = new Communication();
+      const communication = new Communication({ iceServers: ICE_SERVERS });
 
       const roundPoint = (value) => Number(value.toFixed(5));
 

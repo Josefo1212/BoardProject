@@ -27,7 +27,46 @@ const DEFAULTS = {
     file: "data/board.json",
     debounceMs: 500,
   },
+  peer: {
+    room: "pizarra",
+    transport: "auto",
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+  },
 };
+
+const DEFAULT_ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
+const ROOM_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+function readIceServers(value) {
+  if (value === undefined || value === null || value === "") {
+    return [...DEFAULT_ICE_SERVERS];
+  }
+
+  let parsed = value;
+
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      console.warn("[Config] ICE_SERVERS_JSON no es JSON válido; se usará STUN por defecto.");
+      return [...DEFAULT_ICE_SERVERS];
+    }
+  }
+
+  if (!Array.isArray(parsed)) {
+    return [...DEFAULT_ICE_SERVERS];
+  }
+
+  const servers = parsed.filter((server) => {
+    if (server === null || typeof server !== "object") return false;
+    return (
+      (typeof server.urls === "string" && server.urls.trim() !== "") ||
+      (Array.isArray(server.urls) && server.urls.some((url) => typeof url === "string" && url.trim() !== ""))
+    );
+  });
+
+  return servers.length > 0 ? servers : [...DEFAULT_ICE_SERVERS];
+}
 
 function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -99,6 +138,7 @@ export function loadConfig(configPath, rootDir) {
   const rawAccess = isPlainObject(raw.access) ? raw.access : {};
   const rawLimits = isPlainObject(raw.limits) ? raw.limits : {};
   const rawPersistence = isPlainObject(raw.persistence) ? raw.persistence : {};
+  const rawPeer = isPlainObject(raw.peer) ? raw.peer : {};
 
   const legacyClients = Array.isArray(raw.clients) ? raw.clients : [];
   const legacyIps = legacyClients
@@ -132,11 +172,16 @@ export function loadConfig(configPath, rootDir) {
 
   const server = {
     host: readString(rawServer.host, DEFAULTS.server.host, "server.host"),
-    port: readNumber(rawServer.port, DEFAULTS.server.port, "server.port", {
-      min: 1,
-      max: 65_535,
-      integer: true,
-    }),
+    port: readNumber(
+      process.env.PORT === undefined ? rawServer.port : Number(process.env.PORT),
+      DEFAULTS.server.port,
+      "server.port",
+      {
+        min: 1,
+        max: 65_535,
+        integer: true,
+      },
+    ),
     maxClients: readNumber(rawServer.maxClients, DEFAULTS.server.maxClients, "server.maxClients", {
       min: 1,
       max: 10_000,
@@ -214,5 +259,33 @@ export function loadConfig(configPath, rootDir) {
     ),
   };
 
-  return { server, access, limits, persistence };
+  const room = readString(
+    process.env.PEER_ROOM === undefined ? rawPeer.room : process.env.PEER_ROOM,
+    DEFAULTS.peer.room,
+    "peer.room",
+  );
+
+  if (!ROOM_PATTERN.test(room)) {
+    throw new Error("La configuración de 'peer.room' solo admite letras, números, guiones y guiones bajos (máximo 64).");
+  }
+
+  const transport = readString(
+    process.env.BOARD_TRANSPORT === undefined ? rawPeer.transport : process.env.BOARD_TRANSPORT,
+    DEFAULTS.peer.transport,
+    "peer.transport",
+  ).toLowerCase();
+
+  if (!["auto", "p2p", "ws"].includes(transport)) {
+    throw new Error("La configuración de 'peer.transport' debe ser 'auto', 'p2p' o 'ws'.");
+  }
+
+  const peer = {
+    room,
+    transport,
+    iceServers: readIceServers(
+      process.env.ICE_SERVERS_JSON === undefined ? rawPeer.iceServers : process.env.ICE_SERVERS_JSON,
+    ),
+  };
+
+  return { server, access, limits, persistence, peer };
 }

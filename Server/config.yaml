@@ -23,6 +23,15 @@ limits:
   maxMessagesPerSecond: 500
 
 persistence:
-  enabled: true
+  # La pizarra se reinicia al terminar la sesión (cuando se desconecta el
+  # último cliente). El guardado en disco está desactivado en el código.
+  enabled: false
   file: "data/board.json"
   debounceMs: 500
+
+peer:
+  room: "pizarra"
+  # auto intenta DataChannel y deja WebSocket como fallback.
+  transport: "auto"
+  iceServers:
+    - urls: "stun:stun.l.google.com:19302"

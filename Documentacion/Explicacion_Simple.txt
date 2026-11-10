@@ -19,6 +19,11 @@ El programa tiene dos partes:
 - El cliente: es la pantalla o pagina que usa cada persona para dibujar.
   Se conecta al servidor y muestra lo que pasa en la pizarra.
 
+Para publicarlo en Internet se puede usar Render como servicio web. Render
+ejecuta el servidor con el puerto que entrega en la variable PORT y publica
+la pagina con HTTPS. Al abrir la URL de Render, la pizarra usa
+automaticamente WSS (WebSocket seguro); no hay que agregar :3005.
+
 El backend ya esta terminado. El cliente actual es una base sencilla y
 todavia debe completarse para aprovechar el tiempo real punto por punto.
 
@@ -62,9 +67,10 @@ Pizarra en memoria:
   encendido. Cada trazo guarda sus puntos y su estilo (color, grosor,
   opacidad).
 
-Archivo de respaldo:
-  Es un archivo donde el servidor guarda la pizarra para recuperarla si
-  se reinicia. Se guarda solo lo que ya esta terminado.
+Archivo de respaldo (opcional):
+  Es un archivo donde el servidor podria guardar la pizarra para
+  recuperarla si se reinicia. En la version actual esta desactivado: la
+  pizarra se reinicia al terminar la sesion.
 
 
 4. FLUJO COMPLETO, PASO A PASO
@@ -76,9 +82,9 @@ Archivo de respaldo:
 
 4.2 Una laptop se conecta
   La laptop abre la pagina del cliente y pulsa "Conectar". La direccion
-  del servidor ya esta definida en el codigo del cliente, por lo que no
-  es necesario escribirla manualmente. El cliente abre el canal WebSocket
-  con el servidor.
+  del servidor se detecta automaticamente del host de la pagina (mismo
+  host, puerto 3005), por lo que no es necesario escribirla manualmente.
+  El cliente abre el canal WebSocket con el servidor.
   El servidor revisa:
   - Que el origen de la pagina este permitido.
   - Que la IP este autorizada, si el modo de acceso es por lista.
@@ -104,8 +110,7 @@ Archivo de respaldo:
 
 4.5 Alguien borra la pizarra
   El cliente avisa al servidor. El servidor elimina todos los trazos de
-  su memoria y avisa a todos para que borren sus pantallas. Este cambio
-  tambien queda guardado en el archivo de respaldo.
+  su memoria y avisa a todos para que borren sus pantallas.
 
 4.6 Alguien se desconecta
   El servidor lo elimina de la lista de conectados y avisa a los demas
@@ -113,13 +118,13 @@ Archivo de respaldo:
   pierden.
 
 4.7 El servidor se reinicia
-  Si la persistencia esta activada, el servidor lee el archivo de
-  respaldo al arrancar y vuelve a cargar los trazos terminados. Un
-  cliente que entre despues recibe esa pizarra restaurada.
+  La pizarra vive en memoria mientras haya clientes conectados. Si el
+  servidor se reinicia, la pizarra empieza vacia porque el guardado en
+  disco esta desactivado en la version actual.
 
 4.8 El servidor se apaga
-  Antes de cerrarse, guarda la pizarra, avisa a los clientes que el
-  servidor se esta apagando y cierra las conexiones de forma ordenada.
+  Avisa a los clientes que el servidor se esta apagando y cierra las
+  conexiones de forma ordenada.
 
 
 5. QUE HACE EL SERVIDOR CON CADA MENSAJE
@@ -236,12 +241,12 @@ Parte de configuracion:
 Parte de comunicacion:
   Es el corazon del backend. Acepta clientes, recibe mensajes, valida,
   actualiza la pizarra, reenvia cambios, controla latidos, limites y
-  guarda el respaldo.
+  sirve el cliente web por HTTP.
 
 Parte de pruebas:
   Comprueba automaticamente que la difusion de trazos, el tiempo real,
-  el borrado, los errores, el acceso por lista y la persistencia
-  funcionen bien.
+  el borrado, los errores, el acceso por lista, los archivos estaticos y
+  la reinicializacion de la pizarra funcionen bien.
 
 
 10. ESTADO ACTUAL
@@ -251,12 +256,13 @@ El backend esta completo y probado. Puede:
 - Compartir trazos en tiempo real usando avisos de inicio, puntos y fin.
 - Entregar la pizarra completa a quien se conecte.
 - Borrar la pizarra para todos.
-- Guardar y recuperar la pizarra.
+- Reiniciar la pizarra al terminar la sesion (sin guardado en disco).
 - Controlar errores, abusos, limites y desconexiones.
 
-El cliente actual puede conectarse, dibujar y borrar. La direccion del
-servidor se configura directamente en Client/js/config.js y ya no se
-solicita en la vista. El punto de entrada es Client/app.js; sus piezas
+El cliente actual puede conectarse, dibujar y borrar. La laptop del
+servidor abre http://localhost:3005 y las demas laptops abren
+http://IP_DEL_SERVIDOR:3005. La direccion del WebSocket se detecta sola,
+sin editar ninguna IP. El punto de entrada es Client/app.js; sus piezas
 JavaScript y estilos estan distribuidos en carpetas separadas. El dibujo
 se actualiza localmente mientras se hace y se comparte completo al soltar,
 sin reiniciar ni cortar la conexion.

@@ -266,7 +266,7 @@ test("bloquea clientes fuera de la lista cuando el modo es allowlist", async () 
   await communication.close();
 });
 
-test("persiste la pizarra entre reinicios del servidor", async () => {
+test("reinicia la pizarra cuando termina la sesión", async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "board-persistence-"));
   const file = path.join(directory, "board.json");
   const options = { persistence: { enabled: true, file, debounceMs: 0 } };
@@ -294,16 +294,14 @@ test("persiste la pizarra entre reinicios del servidor", async () => {
     await bob.close();
     await first.communication.close();
 
-    assert.ok(fs.existsSync(file));
+    // La pizarra no se conserva entre sesiones: no se escribe el archivo.
+    assert.equal(fs.existsSync(file), false);
 
     const second = await startServer(options);
     const carol = await connect(second.port);
     const snapshot = await carol.waitFor("snapshot");
-    const restored = snapshot.strokes.find((stroke) => stroke.strokeId === "persisted-1");
 
-    assert.ok(restored);
-    assert.equal(restored.points.length, 2);
-    assert.equal(restored.complete, true);
+    assert.deepEqual(snapshot.strokes, []);
 
     await carol.close();
     await second.communication.close();

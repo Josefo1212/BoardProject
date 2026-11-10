@@ -38,7 +38,7 @@ export class Communication {
   #heartbeatTimer = null;
   #closed = false;
 
-  constructor({ server, access, limits, persistence }) {
+  constructor({ server, access, limits, persistence, httpServer = null, noServer = false }) {
     this.#allowlistEnabled = access.mode === "allowlist";
     this.#allowedIps = new Set(
       access.allowedIps.map((ip) => this.#normalizeIp(ip)).filter((ip) => ip !== ""),
@@ -56,13 +56,25 @@ export class Communication {
     // Sin memoria persistida entre sesiones
     // this.#loadPersistedBoard();
 
-    this.#server = new WebSocketServer({
-      host: server.host,
-      port: server.port,
+    // Si el llamador ya creó un servidor HTTP (para servir también el
+    // cliente), el WebSocket se engancha a él en lugar de abrir su propio
+    // puerto. Así un único puerto expone la página y el WebSocket.
+    const serverOptions = {
       maxPayload: this.#maxPayloadBytes,
       clientTracking: false,
       perMessageDeflate: false,
-    });
+    };
+
+    if (noServer) {
+      serverOptions.noServer = true;
+    } else if (httpServer) {
+      serverOptions.server = httpServer;
+    } else {
+      serverOptions.host = server.host;
+      serverOptions.port = server.port;
+    }
+
+    this.#server = new WebSocketServer(serverOptions);
 
     this.#server.on("connection", (socket, request) => {
       this.#handleConnection(socket, request);
@@ -86,6 +98,16 @@ export class Communication {
 
   get strokeCount() {
     return this.#strokes.size;
+  }
+
+  /**
+   * Enruta un upgrade HTTP hacia el WebSocket del tablero. Se usa cuando
+   * varios WebSocketServer comparten el mismo servidor HTTP (`noServer`).
+   */
+  handleUpgrade(request, socket, head) {
+    this.#server.handleUpgrade(request, socket, head, (ws) => {
+      this.#server.emit("connection", ws, request);
+    });
   }
 
   async close() {
@@ -140,6 +162,35 @@ export class Communication {
     });
   }
 
+  /**
+   * Conecta un peer P2P al tablero. Registra su `PeerSocket` como un cliente
+   * más de `Communication`, compartiendo la misma lógica de validación,
+   * snapshot, broadcast y límites que un cliente WebSocket normal.
+   */
+  attachPeer(socket, { peerId = null, remoteIp = "p2p", origin = null } = {}) {
+    if (this.#closed) {
+      socket.close(CLOSE_GOING_AWAY, "Servidor apagado");
+      return null;
+    }
+
+    if (this.#clients.size >= this.#maxClients) {
+      this.#reject(
+        socket,
+        "SERVER_FULL",
+        "El servidor alcanzó el número máximo de clientes.",
+        CLOSE_SERVER_FULL,
+      );
+      return null;
+    }
+
+    return this.#registerClient(socket, {
+      remoteIp,
+      origin,
+      isPeer: true,
+      peerId,
+    });
+  }
+
   #handleConnection(socket, request) {
     socket.on("error", (error) => {
       console.error(`[WS] Error de socket: ${error.message}`);
@@ -179,10 +230,16 @@ export class Communication {
       return;
     }
 
+    this.#registerClient(socket, { remoteIp, origin, isPeer: false });
+  }
+
+  #registerClient(socket, { remoteIp = "desconocida", origin = null, isPeer = false, peerId = null } = {}) {
     const client = {
       id: crypto.randomUUID(),
       socket,
       isAlive: true,
+      isPeer,
+      peerId,
       messageWindowStart: Date.now(),
       messageCount: 0,
       rateLimited: false,
@@ -192,7 +249,11 @@ export class Communication {
     };
 
     this.#clients.add(client);
-    console.log(`[WS] Cliente conectado: id=${client.id} ip=${remoteIp || "desconocida"}`);
+    console.log(
+      `[${isPeer ? "P2P" : "WS"}] Cliente conectado: id=${client.id} ip=${remoteIp}${
+        peerId ? ` peer=${peerId}` : ""
+      }`,
+    );
 
     socket.on("pong", () => {
       client.isAlive = true;
@@ -214,6 +275,8 @@ export class Communication {
     });
 
     this.#broadcast({ type: "presence", clients: this.#clients.size });
+
+    return client;
   }
 
   #handleDisconnect(client) {

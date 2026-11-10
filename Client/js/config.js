@@ -1,31 +1,50 @@
 const params = new URLSearchParams(window.location.search);
 const configuredServer = params.get("server")?.trim();
 const pageHost = window.location.hostname;
+const pagePort = window.location.port;
+const pageProtocol = window.location.protocol;
+const isHttpPage = pageProtocol === "http:" || pageProtocol === "https:";
 const localHosts = new Set(["", "localhost", "127.0.0.1", "::1", "[::1]"]);
 const isLocalPage = localHosts.has(pageHost.toLowerCase());
 
-// IP o nombre de la laptop que ejecuta el servidor WebSocket (pnpm start).
+// IP o nombre de la laptop que ejecuta el servidor WebSocket.
 //
-// Modo elegido: cada laptop abre su propio Live Server (http://127.0.0.1:5500),
-// por eso el navegador no puede deducir la IP del servidor y hay que ponerla
-// aqui. Solo se cambia esta linea cuando cambie la IP de la laptop servidor.
+// Déjalo vacío ("") para detección automática. Es lo recomendado:
+// - Si la página la sirve el propio servidor (http://IP_DEL_SERVIDOR:3005),
+//   el cliente usa ese mismo host y funciona en cualquier red.
+// - Si la página se sirve desde otra máquina (por ejemplo Live Server en
+//   http://IP_DEL_SERVIDOR:5500), el cliente usa esa IP con el puerto 3005.
 //
-// Si la pagina se abre desde la laptop del servidor (http://IP_DEL_SERVIDOR:5500)
-// puedes dejar esto vacio y se usara el host de la pagina automaticamente.
+// Solo rellénalo si cada laptop abre su propio Live Server en 127.0.0.1
+// y necesitas apuntar manualmente a la laptop del servidor, por ejemplo:
+//   export const SERVER_HOST = "192.168.1.125";
 //
-// Ver la IP del servidor:  ip -brief addr  (Linux)  |  ipconfig  (Windows)
-// Sobreescribir sin tocar codigo:
+// También puedes sobreescribirlo sin tocar código:
 //   http://127.0.0.1:5500/?server=ws://IP_DEL_SERVIDOR:3005
-export const SERVER_HOST = "10.150.169.177";
+export const SERVER_HOST = "";
 
-// Si la pagina corre en el propio localhost de cada laptop no sirve como
-// referencia: sin SERVER_HOST no hay a donde conectarse.
-const host = SERVER_HOST.trim() || (isLocalPage ? "" : pageHost);
+const wsProtocol = pageProtocol === "https:" ? "wss:" : "ws:";
 
-export const SERVER_URL = configuredServer || (host ? `ws://${host}:3005` : "");
+const autoHost = (() => {
+  if (!isHttpPage) return "";
+  // Servido por el propio servidor de la pizarra: mismo host y puerto.
+  // En Render, el proxy publica el servicio en HTTPS/WSS sin exponer el
+  // puerto interno asignado mediante PORT.
+  if (pagePort === "3005" || pagePort === "") return window.location.host;
+  // Servido desde otra máquina de la red: apunta al puerto del WebSocket.
+  if (!isLocalPage) return `${pageHost}:3005`;
+  return "";
+})();
+
+const manualHost = SERVER_HOST.trim();
+const host = manualHost ? `${manualHost}:3005` : autoHost;
+
+export const SERVER_URL = configuredServer || (host ? `${wsProtocol}//${host}` : "");
 
 export const SERVER_URL_HINT =
-  "Edita SERVER_HOST en Client/js/config.js con la IP de la laptop del servidor, o agrega ?server=ws://IP_DEL_SERVIDOR:3005 a la URL.";
+  "Abre la página desde la laptop del servidor (http://IP_DEL_SERVIDOR:3005) o agrega ?server=ws://IP_DEL_SERVIDOR:3005 a la URL.";
+
+export const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
 
 export const STORAGE = {
   name: "pizarra.name.v1",

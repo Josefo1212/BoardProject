@@ -25,6 +25,8 @@
   "type": "module",
   "dependencies": {
     "js-yaml": "^4.1.0",
+    "node-datachannel": "^0.33.6",
+    "p2p": "^0.14.0",
     "ws": "^8.18.0"
   }
 }

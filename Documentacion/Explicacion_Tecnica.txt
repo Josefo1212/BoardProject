@@ -16,9 +16,25 @@ Tecnologías:
 - Persistencia en un archivo JSON local.
 - Pruebas con node:test.
 
-El backend NO sirve archivos HTTP del frontend. Solo expone WebSocket.
-El cliente estático debe servirse aparte (por ejemplo, con Python,
-Vite, nginx o cualquier servidor HTTP).
+El servidor sirve el cliente estático y expone el WebSocket en el mismo
+puerto (3005 por defecto). Las demás laptops solo necesitan abrir
+http://IP_DEL_SERVIDOR:3005. También se puede servir el cliente aparte
+(por ejemplo, con Python, Vite o nginx) e indicar el servidor con
+?server=ws://IP_DEL_SERVIDOR:3005.
+
+Despliegue en Render:
+- Directorio raiz del servicio: Server (o usar el archivo render.yaml de la
+  raiz del repositorio).
+- Build command: pnpm install --frozen-lockfile.
+- Start command: pnpm start.
+- El servidor ya lee PORT, por lo que no se debe fijar el puerto publico.
+- Si Render entrega una URL HTTPS, el cliente se conecta automaticamente a
+  wss://el-mismo-host. El puerto interno no se agrega a la URL.
+- El modo `auto` intenta DataChannel P2P mediante `/signal`. Si la red del
+  usuario bloquea WebRTC, el cliente conserva la conexión WebSocket por
+  `/board`. STUN ya está configurado; para máxima cobertura en redes
+  restrictivas se debe configurar el mismo servidor TURN en el servidor y en
+  `Client/js/config.js`.
 
 
 2. ARQUITECTURA
@@ -31,7 +47,8 @@ Cliente C ─┘                         │
                                      └── Archivo data/board.json
 
 Servidor:
-- Acepta conexiones WebSocket.
+- Sirve el cliente estático por HTTP (HTML, JS, CSS y fuentes).
+- Acepta conexiones WebSocket en el mismo puerto.
 - Valida identidad mínima (origen e IP opcional).
 - Valida cada mensaje recibido.
 - Mantiene la pizarra en memoria.
@@ -728,56 +745,50 @@ También conviene que el frontend:
 - Maneje snapshot, presence, error y server-shutdown.
 - Implemente reconexión con reintento.
 
-La URL del WebSocket se define en codigo usando el host actual y el
-puerto 3005; la vista no muestra ningun campo para editarla.
+La URL del WebSocket se detecta automáticamente a partir del host de la
+página (mismo host, puerto 3005). La vista no muestra ningún campo para
+editarla. SERVER_HOST en Client/js/config.js queda vacío por defecto y
+solo se usa como override manual; también se puede pasar ?server=... en
+la URL.
 
 El servidor ya soporta ambos formatos: el streaming y el stroke completo.
 
 
 11. EJECUCION
 --------------------------------------------------
-Backend:
-  cd BoardProject\Server
+Modo recomendado (un solo comando):
+
+  cd BoardProject/Server
   pnpm install
   pnpm start
 
-Servidor esperado:
-  ws://0.0.0.0:3005
+El servidor queda escuchando en:
+  WebSocket: ws://0.0.0.0:3005
+  Cliente:   http://IP_DEL_SERVIDOR:3005
 
-Abrir firewall en la laptop del servidor (IMPRESCINDIBLE):
+La laptop del servidor abre http://localhost:3005.
+Las demás laptops de la misma WiFi abren http://IP_DEL_SERVIDOR:3005
+(la IP se imprime al arrancar) y pulsan "Conectar". No hay que editar
+ninguna IP: el cliente usa el mismo host desde el que se sirve la página.
+
+Abrir el firewall en la laptop del servidor (IMPRESCINDIBLE):
   Linux con ufw:
     sudo ufw allow 3005/tcp
     sudo ufw reload
   Windows (PowerShell administrador):
-    New-NetFirewallRule -DisplayName "Pizarra WebSocket 3005" -Direction Inbound -Protocol TCP -LocalPort 3005 -Action Allow
-
-  Nota: el puerto 5500 (Live Server) solo se abre si las demas laptops
-  entran al Live Server de la laptop del servidor. En el modo elegido cada
-  laptop usa su propio Live Server, asi que 5500 no necesita abrirse.
+    New-NetFirewallRule -DisplayName "Pizarra 3005" -Direction Inbound -Protocol TCP -LocalPort 3005 -Action Allow
 
 Ver la IP del servidor en la red WiFi:
-  Linux: ip -brief addr   (usar la IP de wlan0, p. ej. 10.150.169.177)
+  Linux: ip -brief addr   (usar la IP de wlan0)
   Windows: ipconfig        (usar la IPv4 de la interfaz WiFi)
 
-Frontend con Live Server (reemplaza a python3 -m http.server):
-  Modo elegido: cada laptop abre su propio Live Server.
-    1. En la laptop del servidor: cd BoardProject/Server && pnpm start
-    2. En CADA laptop: abrir Client/index.html con Live Server
-       (http://127.0.0.1:5500)
-    3. En Client/js/config.js, SERVER_HOST debe tener la IP de la laptop
-       del servidor. Ya viene configurado con 10.150.169.177.
-    4. Si cambia la IP del servidor, actualiza solo esa linea y recarga.
-
-  Alternativa sin tocar codigo, en la barra de direcciones:
-    http://127.0.0.1:5500/?server=ws://IP_DEL_SERVIDOR:3005
-
-  Modo alternativo (Live Server solo en la laptop del servidor):
-    - Configura "liveServer.settings.host": "0.0.0.0" (por defecto Live
-      Server escucha solo en 127.0.0.1 y las demas laptops no lo ven).
-    - Las demas abren http://IP_DEL_SERVIDOR:5500 y el cliente deduce
-      la IP del servidor del host de la pagina.
-
-La IP puede cambiar según la red WiFi: si cambia, actualiza SERVER_HOST.
+Modo alternativo (cada laptop sirve su propio cliente con Live Server):
+  1. En la laptop del servidor: cd BoardProject/Server && pnpm start
+  2. En CADA laptop: abrir Client/index.html con Live Server
+     (http://127.0.0.1:5500)
+  3. Como la página corre en localhost, hay que indicar la IP del servidor:
+     - editar SERVER_HOST en Client/js/config.js, o
+     - abrir http://127.0.0.1:5500/?server=ws://IP_DEL_SERVIDOR:3005
 
 Si access.mode es "allowlist", agrega la IP de cada equipo autorizado en
 access.allowedIps dentro de Server/config.yaml. La IP del equipo cliente
@@ -786,12 +797,13 @@ cambian por DHCP es facil que una laptop quede bloqueada con codigo 1008;
 para una pizarra de aula conviene access.mode: "open".
 
 Persistencia:
-  Server/data/board.json (ignorado por git)
+  La pizarra se reinicia cuando se desconecta el último cliente. El
+  guardado en disco está desactivado en el código (config.yaml tiene
+  persistence.enabled: false para reflejarlo).
 
 
 12. POSIBLES MEJORAS
 --------------------------------------------------
-- Servir el frontend desde el mismo servidor para un solo comando.
 - Salas o pizarras múltiples mediante rutas o query string.
 - Autenticación con token y nombres de usuario.
 - Deshacer/rehacer por cliente o colaborativo.
