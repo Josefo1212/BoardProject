@@ -21,23 +21,11 @@ const isLocalPage = localHosts.has(pageHost.toLowerCase());
 //
 // También puedes sobreescribirlo sin tocar código:
 //   http://127.0.0.1:5500/?server=ws://IP_DEL_SERVIDOR:3005
-export const SERVER_HOST = "";
+export const SERVER_HOST = "10.150.169.177";
 
-const wsProtocol = pageProtocol === "https:" ? "wss:" : "ws:";
-
-const autoHost = (() => {
-  if (!isHttpPage) return "";
-  // Servido por el propio servidor de la pizarra: mismo host y puerto.
-  // En Render, el proxy publica el servicio en HTTPS/WSS sin exponer el
-  // puerto interno asignado mediante PORT.
-  if (pagePort === "3005" || pagePort === "") return `${window.location.host}/board`;
-  // Servido desde otra máquina de la red: apunta al puerto del WebSocket.
-  if (!isLocalPage) return `${pageHost}:3005/board`;
-  return "";
-})();
-
-const manualHost = SERVER_HOST.trim();
-const host = manualHost ? `${manualHost}:3005/board` : autoHost;
+// Si la pagina corre en el propio localhost de cada laptop no sirve como
+// referencia: sin SERVER_HOST no hay a donde conectarse.
+const host = SERVER_HOST.trim() || (isLocalPage ? "" : pageHost);
 
 export const SERVER_URL = configuredServer || (host ? `${wsProtocol}//${host}` : "");
 
