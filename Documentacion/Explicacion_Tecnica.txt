@@ -809,7 +809,7 @@ Persistencia:
 - Deshacer/rehacer por cliente o colaborativo.
 - Compresión selectiva de snapshots grandes.
 - Persistencia en base de datos en lugar de JSON local.
-- TLS para usar wss:// en redes no confiables.
+- TURN propio (coturn) integrado por defecto para redes con NAT simétrico.
 - Métricas y logs estructurados.
 - Limpieza de trazos parciales de clientes desconectados.
 - Pruebas de carga con muchas conexiones simultáneas.
@@ -824,3 +824,87 @@ con ping/pong, los clientes lentos o inválidos se controlan, y la
 pizarra se guarda de forma atómica para sobrevivir a reinicios. El
 cliente puede usar el protocolo de streaming para lograr colaboración
 punto por punto en tiempo real.
+
+
+14. ANEXO: VIDEOLLAMADA P2P, SALA -av Y CONTEXTO SEGURO
+--------------------------------------------------
+14.1 Componentes
+
+La videollamada se apoya en la misma infraestructura de señalización que el
+transporte P2P del tablero:
+
+- Server/src/signaling.js
+    Hub y servidor de señalización. Mantiene una lista blanca de salas
+    (room allowlist). En producción son "pizarra" y "pizarra-av". El servidor
+    NO se une a "-av": solo reenvía mensajes entre suscriptores.
+- Server/src/config.js
+    Deriva peer.rooms = ["<sala>", "<sala>-av"] y expone server.tls
+    (enabled/cert/key) con validación (si enabled es true exige cert y key).
+- Server/src/index.js
+    Crea el servidor HTTP o HTTPS según server.tls y pasa `rooms` al hub y al
+    servidor de señalización.
+- Server/src/static.js
+    Añade la cabecera Permissions-Policy: camera=(self), microphone=(self) a
+    todas las respuestas.
+- Client/js/MediaCall.js
+    Clase MediaCall: adquiere cámara/micrófono, crea un Sender y un Receiver,
+    construye el panel, gestiona dispositivos, indicador de voz y controles.
+- Client/js/config.js
+    ICE_SERVERS (STUN + TURN_SERVERS + ?turn=) y TURN_SERVERS.
+- Client/js/P2PCommunication.js
+    SignalingDriver ahora se exporta y acepta handlers {open, close, error}.
+
+14.2 Señalización y sala propia
+
+Cada cliente abre un WebSocket a /signal (el mismo endpoint que el tablero) y
+usa la librería p2p (Client/js/vendor/p2p.esm.js):
+
+- Sender: publica la cámara/micrófono y abre el canal de datos "av-state".
+- Receiver: recibe los flujos de los demás.
+
+El handshake de la librería:
+  1. El Sender publica {type:"invoke"} en ["receiver", sala] para anunciarse.
+  2. El Receiver lo recibe y responde con {type:"invoke"} en
+     ["sender", sala, idSender], incluyendo sus credenciales (selfId).
+  3. El Sender verifica las credenciales, crea la conexión y publica la oferta
+     en ["receiver", sala, idReceiver].
+  4. El Receiver recibe la oferta y responde con la respuesta SDP en
+     ["sender", sala, idSender].
+  5. Se intercambian candidatos ICE por los mismos namespaces.
+
+Para evitar que un cliente se conecte consigo mismo (su propio Receiver publica
+un invoke que su propio Sender escucharía), el Receiver envía como credencial
+su identificador estable (selfId) y el Sender lo verifica con `verify`:
+rechaza cualquier invoke cuya credencial selfId coincida con la suya.
+
+14.3 Lista blanca de salas
+
+normalizeNamespace(namespace, rooms) acepta una sala, una lista o un Set. Solo
+se permiten las salas de la lista (null = cualquier sala válida, por
+compatibilidad). La lista de producción es ["pizarra", "pizarra-av"]. Un intento
+de suscribir o publicar en otra sala devuelve INVALID_NAMESPACE.
+
+El límite maxPayloadBytes (256 KB) no se tocó: una oferta/respuesta SDP ocupa
+bastante menos y el canal "av-state" lleva cargas mínimas.
+
+14.4 Contexto seguro (HTTPS/localhost)
+
+getUserMedia exige un contexto seguro. Por eso:
+- En http://localhost funciona sin cambios.
+- En Render (https) funciona sin cambios.
+- En http://IP:3005 el navegador lo bloquea. Opciones: flag
+  chrome://flags/#unsafely-treat-insecure-origin-as-secure, certificados
+  locales con mkcert y server.tls, o un túnel HTTPS.
+
+14.5 TURN y NAT simétrico
+
+STUN basta en la mayoría de redes. Con NAT simétrico (oficinas, VPN, algunas
+móviles) hace falta TURN. Se configura con TURN_SERVERS en Client/js/config.js
+o con ?turn=... en la URL. Detalles y pasos en Documentacion/Videollamada.txt.
+
+14.6 Pruebas
+
+Server/test/signaling.test.js cubre: normalización de salas, aceptación de
+"pizarra-av", rechazo de salas no permitidas, reenvío entre clientes de la sala
+-av y la lista blanca del hub. Se ejecutan con `pnpm test` en Server/ (18
+pruebas en total, incluidas las del tablero).

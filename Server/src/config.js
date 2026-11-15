@@ -10,6 +10,11 @@ const DEFAULTS = {
     pingIntervalMs: 30_000,
     maxPayloadBytes: 256 * 1024,
     maxBufferedBytes: 8 * 1024 * 1024,
+    tls: {
+      enabled: false,
+      cert: null,
+      key: null,
+    },
   },
   access: {
     mode: "open",
@@ -121,6 +126,24 @@ function readStringList(value, fallback, name) {
   return items.length > 0 ? items : [...fallback];
 }
 
+/**
+ * Lee una ruta opcional (por ejemplo un certificado TLS). Las rutas relativas
+ * se resuelven contra `rootDir` para que la configuración sea portable.
+ * Devuelve null si no se indica nada.
+ */
+function readOptionalPath(value, rootDir) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error("Las rutas de configuración deben ser textos no vacíos.");
+  }
+
+  const trimmed = value.trim();
+  return path.isAbsolute(trimmed) ? trimmed : path.resolve(rootDir, trimmed);
+}
+
 export function loadConfig(configPath, rootDir) {
   let raw;
 
@@ -170,6 +193,18 @@ export function loadConfig(configPath, rootDir) {
     "persistence.file",
   );
 
+  const rawTls = isPlainObject(rawServer.tls) ? rawServer.tls : {};
+  const tlsEnabled =
+    rawTls.enabled === undefined ? DEFAULTS.server.tls.enabled : Boolean(rawTls.enabled);
+  const tlsCert = readOptionalPath(rawTls.cert, rootDir);
+  const tlsKey = readOptionalPath(rawTls.key, rootDir);
+
+  if (tlsEnabled && (!tlsCert || !tlsKey)) {
+    throw new Error(
+      "La configuración de 'server.tls' requiere 'cert' y 'key' cuando 'enabled' es true.",
+    );
+  }
+
   const server = {
     host: readString(rawServer.host, DEFAULTS.server.host, "server.host"),
     port: readNumber(
@@ -205,6 +240,11 @@ export function loadConfig(configPath, rootDir) {
       "server.maxBufferedBytes",
       { min: 1_024, max: 128 * 1024 * 1024, integer: true },
     ),
+    tls: {
+      enabled: tlsEnabled,
+      cert: tlsCert,
+      key: tlsKey,
+    },
   };
 
   const access = {
@@ -281,6 +321,7 @@ export function loadConfig(configPath, rootDir) {
 
   const peer = {
     room,
+    rooms: [...new Set([room, `${room}-av`])],
     transport,
     iceServers: readIceServers(
       process.env.ICE_SERVERS_JSON === undefined ? rawPeer.iceServers : process.env.ICE_SERVERS_JSON,

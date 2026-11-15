@@ -1,4 +1,6 @@
+import fs from "node:fs";
 import http from "node:http";
+import https from "node:https";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,15 +16,36 @@ const rootDir = path.join(__dirname, "..");
 const config = loadConfig(path.join(rootDir, "config.yaml"), rootDir);
 const clientDir = path.join(rootDir, "..", "Client");
 
-// Un solo servidor HTTP sirve el cliente, la señalización y el WebSocket
-// fallback. Render solo necesita publicar este puerto.
-const httpServer = http.createServer(createStaticHandler(clientDir));
+// TLS es opcional: si `server.tls.enabled` es true servimos HTTPS/WSS, lo que
+// además habilita `getUserMedia` en la red local (orígenes seguros). En Render
+// el proxy ya termina TLS, así que allí se deja desactivado.
+function createHttpServer() {
+  const handler = createStaticHandler(clientDir);
+
+  if (!config.server.tls.enabled) {
+    return { server: http.createServer(handler), secure: false };
+  }
+
+  const { cert, key } = config.server.tls;
+
+  const credentials = {
+    cert: fs.readFileSync(cert),
+    key: fs.readFileSync(key),
+  };
+
+  return { server: https.createServer(credentials, handler), secure: true };
+}
+
+const { server: httpServer, secure } = createHttpServer();
+const wsProtocol = secure ? "wss" : "ws";
+const httpProtocol = secure ? "https" : "http";
 const communication = new Communication({ ...config, noServer: true });
-const signalingHub = new SignalingHub({ room: config.peer.room });
+const signalingHub = new SignalingHub({ room: config.peer.room, rooms: config.peer.rooms });
 const signaling = new SignalingServer({
   hub: signalingHub,
   access: config.access,
   room: config.peer.room,
+  rooms: config.peer.rooms,
   maxPayloadBytes: config.server.maxPayloadBytes,
   maxMessagesPerSecond: config.limits.maxMessagesPerSecond,
 });
@@ -61,11 +84,11 @@ function lanAddresses() {
 
 function logListening() {
   const { host, port } = config.server;
-  console.log(`Servidor WebSocket escuchando en ws://${host}:${port}`);
-  console.log(`Cliente web disponible en http://localhost:${port}`);
+  console.log(`Servidor WebSocket escuchando en ${wsProtocol}://${host}:${port}`);
+  console.log(`Cliente web disponible en ${httpProtocol}://localhost:${port}`);
 
   for (const address of lanAddresses()) {
-    console.log(`  En la red WiFi: http://${address}:${port}`);
+    console.log(`  En la red WiFi: ${httpProtocol}://${address}:${port}`);
   }
 
   console.log(

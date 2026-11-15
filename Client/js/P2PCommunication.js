@@ -4,17 +4,24 @@ const CONNECTING = 0;
 const OPEN = 1;
 const CLOSED = 3;
 
-class SignalingDriver {
+export class SignalingDriver {
   #socket;
   #subscriptions = new Map();
   #pending = [];
 
-  constructor(url) {
+  constructor(url, handlers = {}) {
     this.#socket = new WebSocket(url);
     this.#socket.addEventListener("open", () => {
       for (const payload of this.#pending.splice(0)) {
         this.#socket.send(JSON.stringify(payload));
       }
+      handlers.open?.();
+    });
+    this.#socket.addEventListener("close", (event) => {
+      handlers.close?.(event);
+    });
+    this.#socket.addEventListener("error", (event) => {
+      handlers.error?.(event);
     });
     this.#socket.addEventListener("message", (event) => {
       let payload;

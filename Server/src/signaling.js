@@ -9,6 +9,32 @@ const NAMESPACE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const NAMESPACE_ROOM = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
+ * Convierte una sala (o lista de salas) permitidas en un Set.
+ *
+ * - null/undefined  -> null, que significa "cualquier sala válida" (compat).
+ * - texto           -> Set con esa única sala.
+ * - array/Set       -> Set con las salas no vacías indicadas.
+ *
+ * Un array vacío produce un Set vacío: no se permite ninguna sala.
+ */
+export function toRoomSet(rooms) {
+  if (rooms === null || rooms === undefined) {
+    return null;
+  }
+
+  if (rooms instanceof Set) {
+    return rooms;
+  }
+
+  const list = Array.isArray(rooms) ? rooms : [rooms];
+  return new Set(list.filter((room) => typeof room === "string" && room !== ""));
+}
+
+function isRoomAllowed(namespaceRoom, allowedRooms) {
+  return allowedRooms === null || allowedRooms.has(namespaceRoom);
+}
+
+/**
  * Valida un namespace de señalización de la librería `p2p`.
  *
  * La librería usa dos formatos:
@@ -17,9 +43,13 @@ const NAMESPACE_ROOM = /^[A-Za-z0-9_-]{1,64}$/;
  *   ['receiver', sala]
  *   ['receiver', sala, id]
  *
+ * `rooms` puede ser una sala, una lista de salas o un Set. Solo se aceptan
+ * las salas de esa lista (evita salas arbitrarias). Si es null se acepta
+ * cualquier sala con formato válido.
+ *
  * Devuelve el namespace normalizado o null si no es válido.
  */
-export function normalizeNamespace(namespace, room = null) {
+export function normalizeNamespace(namespace, rooms = null) {
   if (!Array.isArray(namespace) || namespace.length < 2 || namespace.length > 3) {
     return null;
   }
@@ -34,7 +64,7 @@ export function normalizeNamespace(namespace, room = null) {
     return null;
   }
 
-  if (room && namespaceRoom !== room) {
+  if (!isRoomAllowed(namespaceRoom, toRoomSet(rooms))) {
     return null;
   }
 
@@ -45,8 +75,8 @@ export function normalizeNamespace(namespace, room = null) {
   return id === undefined ? [kind, namespaceRoom] : [kind, namespaceRoom, id];
 }
 
-export function namespaceKey(namespace, room = null) {
-  const normalized = normalizeNamespace(namespace, room);
+export function namespaceKey(namespace, rooms = null) {
+  const normalized = normalizeNamespace(namespace, rooms);
   return normalized ? normalized.join(":") : null;
 }
 
@@ -80,16 +110,22 @@ function normalizeIp(ip) {
  */
 export class SignalingHub {
   #room;
+  #rooms;
   #localSubs = new Map();
   #remoteSubs = new Map();
   #remoteNamespaces = new Map();
 
-  constructor({ room = null } = {}) {
+  constructor({ room = null, rooms = null } = {}) {
     this.#room = room;
+    this.#rooms = toRoomSet(rooms);
   }
 
   get room() {
     return this.#room;
+  }
+
+  get rooms() {
+    return this.#rooms === null ? null : [...this.#rooms];
   }
 
   get localSubscriberCount() {
@@ -107,7 +143,7 @@ export class SignalingHub {
   // --- Interfaz que consume la librería `p2p` (lado servidor) ---
 
   subscribe(namespace, handler) {
-    const key = namespaceKey(namespace, this.#room);
+    const key = namespaceKey(namespace, this.#rooms);
 
     if (!key) {
       throw new Error("Namespace de señalización inválido.");
@@ -121,7 +157,7 @@ export class SignalingHub {
   }
 
   unsubscribe(namespace, handler) {
-    const key = namespaceKey(namespace, this.#room);
+    const key = namespaceKey(namespace, this.#rooms);
 
     if (!key) {
       return;
@@ -145,7 +181,7 @@ export class SignalingHub {
   }
 
   publish(namespace, message) {
-    const normalized = normalizeNamespace(namespace, this.#room);
+    const normalized = normalizeNamespace(namespace, this.#rooms);
 
     if (!normalized) {
       return 0;
@@ -175,7 +211,7 @@ export class SignalingHub {
   // --- Interfaz para los navegadores (lado remoto) ---
 
   publishRemote(socket, namespace, message) {
-    const normalized = normalizeNamespace(namespace, this.#room);
+    const normalized = normalizeNamespace(namespace, this.#rooms);
 
     if (!normalized) {
       return 0;
@@ -207,7 +243,7 @@ export class SignalingHub {
   }
 
   subscribeRemote(socket, namespace) {
-    const normalized = normalizeNamespace(namespace, this.#room);
+    const normalized = normalizeNamespace(namespace, this.#rooms);
 
     if (!normalized) {
       return null;
@@ -231,7 +267,7 @@ export class SignalingHub {
   }
 
   unsubscribeRemote(socket, namespace) {
-    const key = namespaceKey(namespace, this.#room);
+    const key = namespaceKey(namespace, this.#rooms);
 
     if (!key) {
       return;
@@ -283,6 +319,7 @@ export class SignalingServer {
   #server;
   #hub;
   #room;
+  #rooms;
   #allowedOrigins;
   #allowlistEnabled;
   #allowedIps;
@@ -295,11 +332,13 @@ export class SignalingServer {
     hub,
     access,
     room = null,
+    rooms = null,
     maxPayloadBytes = DEFAULT_MAX_PAYLOAD_BYTES,
     maxMessagesPerSecond = DEFAULT_MAX_MESSAGES_PER_SECOND,
   }) {
     this.#hub = hub;
     this.#room = room;
+    this.#rooms = toRoomSet(rooms ?? room);
     this.#allowedOrigins = new Set(access.allowedOrigins);
     this.#allowlistEnabled = access.mode === "allowlist";
     this.#allowedIps = new Set(access.allowedIps.map(normalizeIp).filter((ip) => ip !== ""));
@@ -469,7 +508,7 @@ export class SignalingServer {
     }
 
     if (op === "publish") {
-      const normalized = normalizeNamespace(namespace, this.#room);
+      const normalized = normalizeNamespace(namespace, this.#rooms);
 
       if (!normalized) {
         sendJson(client.socket, {

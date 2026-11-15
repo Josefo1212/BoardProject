@@ -21,18 +21,69 @@ const isLocalPage = localHosts.has(pageHost.toLowerCase());
 //
 // También puedes sobreescribirlo sin tocar código:
 //   http://127.0.0.1:5500/?server=ws://IP_DEL_SERVIDOR:3005
-export const SERVER_HOST = "10.150.169.177";
+export const SERVER_HOST = "";
 
-// Si la pagina corre en el propio localhost de cada laptop no sirve como
-// referencia: sin SERVER_HOST no hay a donde conectarse.
-const host = SERVER_HOST.trim() || (isLocalPage ? "" : pageHost);
+const wsProtocol = pageProtocol === "https:" ? "wss:" : "ws:";
+
+// Detección automática del servidor:
+// - Servido por el propio servidor (mismo host y puerto, incluido Render).
+// - Servido desde otra máquina de la red: apunta al puerto 3005 del host.
+const autoHost = (() => {
+  if (!isHttpPage) return "";
+  if (pagePort === "3005" || pagePort === "") return window.location.host;
+  if (!isLocalPage) return `${pageHost}:3005`;
+  return "";
+})();
+
+const manualHost = SERVER_HOST.trim();
+const host = manualHost ? `${manualHost}:3005` : autoHost;
 
 export const SERVER_URL = configuredServer || (host ? `${wsProtocol}//${host}` : "");
 
 export const SERVER_URL_HINT =
   "Abre la página desde la laptop del servidor (http://IP_DEL_SERVIDOR:3005) o agrega ?server=ws://IP_DEL_SERVIDOR:3005 a la URL.";
 
-export const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
+// Servidores ICE para WebRTC.
+//
+// STUN es suficiente en la mayoría de redes domésticas, pero falla cuando el
+// NAT es simétrico (algunas redes corporativas, móviles o con VPN). En ese caso
+// los pares no pueden descubrirse y la videollamada no conecta. Rellena
+// TURN_SERVERS con un servidor TURN propio o de un proveedor para garantizarlo:
+//
+//   export const TURN_SERVERS = [
+//     {
+//       urls: "turn:turn.tu-dominio.com:3478",
+//       username: "usuario",
+//       credential: "clave",
+//     },
+//   ];
+//
+// También puedes pasarlo por la URL sin tocar código:
+//   ?turn=turn:host:3478|usuario|clave
+//   ?turn=[{"urls":"turn:host:3478","username":"u","credential":"c"}]
+export const TURN_SERVERS = [];
+
+function readTurnParam(value) {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((server) => server && typeof server === "object" && server.urls);
+    }
+  } catch {
+    // No es JSON: se interpreta como "url|usuario|clave".
+  }
+
+  const [urls, username, credential] = value.split("|").map((part) => part.trim());
+  return urls ? [{ urls, username: username || undefined, credential: credential || undefined }] : [];
+}
+
+export const ICE_SERVERS = [
+  { urls: "stun:stun.l.google.com:19302" },
+  ...TURN_SERVERS,
+  ...readTurnParam(params.get("turn")?.trim()),
+];
 
 export const STORAGE = {
   name: "pizarra.name.v1",

@@ -20,9 +20,16 @@ const MIME_TYPES = {
   ".txt": "text/plain; charset=utf-8",
 };
 
+const BASE_HEADERS = {
+  // Permite que la propia página use cámara y micrófono (videollamadas P2P).
+  // No se delega a iframes de terceros.
+  "Permissions-Policy": "camera=(self), microphone=(self)",
+};
+
 function sendText(response, status, message, extraHeaders = {}) {
   response.writeHead(status, {
     "Content-Type": "text/plain; charset=utf-8",
+    ...BASE_HEADERS,
     ...extraHeaders,
   });
   response.end(message);
@@ -82,6 +89,7 @@ export function createStaticHandler(rootDir) {
       "Content-Type": contentType,
       "Content-Length": stats.size,
       "Cache-Control": "no-cache",
+      ...BASE_HEADERS,
     });
 
     if (request.method === "HEAD") {

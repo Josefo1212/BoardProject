@@ -1,0 +1,267 @@
+PIZARRA COLABORATIVA EN TIEMPO REAL
+VIDEOLLAMADA ENTRE PARES (CAMARA Y MICROFONO)
+==================================================
+
+Este documento explica la videollamada que se agrego a la pizarra: como
+funciona, que necesita para arrancar (contexto seguro/HTTPS), como probarla
+en localhost, en Render y en la red WiFi, y como configurar un servidor TURN
+cuando el NAT de la red es simetrico.
+
+
+1. QUE ES
+--------------------------------------------------
+Cada persona que pulsa el boton "Camara" publica su camara y su microfono y
+ve/escucha a las demas. El audio y el video viajan DIRECTO entre las laptops
+(peer-to-peer); NO pasan por el servidor.
+
+El servidor solo hace de "centralita": intercambia los mensajes de
+negociacion (ofertas, respuestas SDP y candidatos ICE) entre los navegadores.
+Es como un portero que pone en contacto a dos personas y luego se aparta: una
+vez conectadas, la conversacion es directa.
+
+La videollamada es independiente del tablero:
+- El tablero sigue usando su DataChannel "board" y la sala normal ("pizarra").
+- La videollamada usa una sala propia, "pizarra-av", para no mezclarse.
+- Si la videollamada falla, el tablero sigue funcionando con normalidad.
+
+
+2. COMO FUNCIONA (IDEA GENERAL)
+--------------------------------------------------
+Se usa un modelo "mesh" (malla): cada participante se conecta directamente con
+cada uno de los demas. Con 2 personas hay 1 conexion; con 3 hay 3; con 4 hay 6.
+
+Cada cliente crea:
+- Un emisor (Sender): publica su camara/microfono en la sala -av.
+- Un receptor (Receiver): recibe el video/audio de los demas.
+
+Ademas, cada emisor abre un pequeño canal de datos llamado "av-state" por el
+que avisa su nombre, color y si tiene el micro o la camara apagados. Asi todos
+pueden mostrar el icono de "micro silenciado" o "camara apagada" de los demas
+sin que el servidor tenga que intervenir.
+
+El servidor NO entra en la sala -av: solo reenvia los mensajes entre los
+navegadores suscritos a esa sala. Por seguridad, el servidor tiene una lista
+blanca de salas permitidas: la sala del tablero y su version "-av". Cualquier
+otra sala se rechaza.
+
+
+3. REQUISITO IMPRESCINDIBLE: CONTEXTO SEGURO
+--------------------------------------------------
+Los navegadores solo entregan camara y microfono (getUserMedia) en lo que se
+llama un "contexto seguro". Si no, el boton "Camara" mostrara un aviso y no
+abrira los dispositivos.
+
+Se considera contexto seguro:
+- http://localhost  (y http://127.0.0.1, http://[::1]).
+- Cualquier pagina servida por https://  (por ejemplo Render).
+- Un origen marcado manualmente como seguro en los flags del navegador.
+
+NO es contexto seguro:
+- http://IP_DE_LA_RED:3005  (por ejemplo http://192.168.1.20:3005).
+  Esta es la forma habitual de abrir la pizarra en la red WiFi, y por eso la
+  videollamada necesita uno de los metodos de la seccion 4.
+
+Importante: la conexion de la pizarra (WebSocket) SI funciona en
+http://IP:3005; lo unico que el navegador bloquea es el acceso a la camara y
+al microfono. El tablero no se ve afectado.
+
+
+4. COMO PROBARLA
+--------------------------------------------------
+4.1 En la misma laptop (lo mas simple)
+
+  Abre la pizarra en http://localhost:3005. Es contexto seguro, asi que la
+  camara funciona sin tocar nada.
+
+4.2 En Render (HTTPS)
+
+  Render publica la pagina con HTTPS, por lo que ya es contexto seguro. Abre
+  la URL de Render, pulsa "Conectar" y luego "Camara". No hay que configurar
+  certificados.
+
+4.3 En la red WiFi con http://IP:3005
+
+  Elige UNA de estas opciones:
+
+  a) Chrome/Edge: tratar el origen como seguro (solo para pruebas).
+     1. Abre chrome://flags/#unsafely-treat-insecure-origin-as-secure
+     2. En la caja escribe:  http://IP_DEL_SERVIDOR:3005
+        (puedes separar varios con comas)
+     3. Cambia el flag a "Enabled" y reinicia el navegador.
+     Nota: es un ajuste local de cada laptop y no cambia el servidor.
+     Firefox no tiene un flag equivalente sencillo.
+
+  b) Certificado local con mkcert (recomendado para la red).
+     1. Instala mkcert:  https://github.com/FiloSottile/mkcert
+     2. En la carpeta Server/ crea los certificados para la IP del servidor:
+          mkcert -install
+          mkcert -cert-file certs/cert.pem -key-file certs/key.pem \
+                 localhost 127.0.0.1 IP_DEL_SERVIDOR
+        (reemplaza IP_DEL_SERVIDOR por la IP real, por ejemplo 192.168.1.20)
+     3. Activa TLS en Server/config.yaml (ver seccion 4.4) y reinicia el
+        servidor con:  pnpm start
+     4. Abre https://IP_DEL_SERVIDOR:3005 en cada laptop.
+        mkcert -install ya dejo la autoridad en el sistema de ESA laptop; si
+        abres desde otra, instala alli la autoridad que genero mkcert
+        (el archivo rootCA.pem) o acepta el aviso del navegador.
+
+  c) Un tunel con HTTPS (alternativa rapida).
+     Herramientas como cloudflared, ngrok o similar publican tu servidor local
+     con una URL https:// temporal. Es contexto seguro y no requiere tocar el
+     servidor ni los flags del navegador.
+
+4.4 Activar HTTPS en el propio servidor (TLS opcional)
+
+  En Server/config.yaml:
+
+    server:
+      tls:
+        enabled: true
+        cert: "certs/cert.pem"   # relativo a la carpeta Server/
+        key: "certs/key.pem"
+
+  Con esto el servidor sirve HTTPS/WSS. Si enabled es true pero falta cert o
+  key, el arranque falla con un mensaje claro. Las rutas relativas se resuelven
+  respecto a Server/. En Render NO actives TLS: el proxy de Render ya termina
+  HTTPS y habla HTTP con tu servidor.
+
+  Al arrancar con TLS, el log muestra https:// y wss:// en lugar de http:// y
+  ws://.
+
+
+5. REDES DIFICILES: STUN, NAT SIMETRICO Y TURN
+--------------------------------------------------
+Para conectarse, los navegadores necesitan descubrir su direccion publica. Eso
+lo hace STUN (ya viene configurado con stun.l.google.com:19302).
+
+En la mayoria de redes domesticas STUN es suficiente. Pero cuando la red usa
+NAT simetrico (habitual en redes corporativas, algunas redes moviles y con
+VPN), STUN no alcanza y los pares no logran conectarse: la videollamada se
+queda intentando y no se ve ni se oye nada.
+
+La solucion es un servidor TURN, que actua como relevo cuando la conexion
+directa no es posible. El video seguiria pasando por TURN (no por el servidor
+de la pizarra).
+
+Configura TURN de una de estas dos formas:
+
+  a) Editando Client/js/config.js:
+
+       export const TURN_SERVERS = [
+         {
+           urls: "turn:turn.tu-dominio.com:3478",
+           username: "usuario",
+           credential: "clave",
+         },
+       ];
+
+  b) Sin tocar codigo, por la URL:
+
+       ?turn=turn:host:3478|usuario|clave
+       ?turn=[{"urls":"turn:host:3478","username":"u","credential":"c"}]
+
+Los servidores de la pizarra y de la videollamada comparten los mismos ICE
+servers (STUN + TURN). El servidor de la pizarra solo los necesita si en algun
+momento usara su propio transporte P2P; para la videollamada los usan los
+navegadores.
+
+Nota: un TURN publico/abierto es poco fiable y puede filtrar el trafico. Para
+produccion conviene un TURN propio (por ejemplo coturn) con credenciales.
+
+
+6. COMO USARLA
+--------------------------------------------------
+1. Pulsa "Conectar" para entrar en el tablero (la videollamada necesita la
+   conexion al servidor para la senalizacion).
+2. Pulsa el boton "Camara" de la barra superior. El navegador pedira permiso
+   para camara y microfono. La llamada se une SOLO al pulsar; nunca se une
+   automaticamente.
+3. Aparece un panel flotante con tu camara (abajo, en pequeño y espejada) y la
+   de los demas en una rejilla.
+4. Controles del panel:
+   - Microfono: silencia/activa tu micro.
+   - Camara: apaga/enciende tu camara (queda deshabilitado si no hay camara).
+   - Dispositivos: elige que camara o micro usar.
+   - Colgar (rojo): termina la videollamada.
+   - Minimizar: reduce el panel a una pildora con tu avatar.
+5. El panel se puede arrastrar por su cabecera en escritorio.
+6. Un anillo verde alrededor de la ficha indica quien esta hablando.
+7. Si el servidor se cae o pulsas "Desconectar", la videollamada se cierra.
+
+En el movil el panel aparece abajo, se puede minimizar y no tapa la barra de
+herramientas ni los popovers.
+
+
+7. QUE PASA POR EL SERVIDOR (SOLO SENALIZACION)
+--------------------------------------------------
+Por el servidor solo viajan:
+- Mensajes "invoke" para que los pares se encuentren.
+- Ofertas y respuestas SDP (describen camara/micro y codecs).
+- Candidatos ICE (direcciones por las que intentar conectarse).
+- Los avisos de estado "av-state" (nombre, color, micro/camara on/off), que van
+  por el canal de datos de la videollamada, no por el WebSocket.
+
+Una oferta SDP típica ocupa pocos KB, muy por debajo del limite de mensajes del
+servidor (256 KB por defecto). Por eso no fue necesario subir ese limite.
+
+El servidor mantiene su lista blanca de salas: "pizarra" y "pizarra-av".
+Cualquier intento de usar otra sala en la senalizacion se responde con error
+INVALID_NAMESPACE y no se reenvia a nadie.
+
+
+8. PRUEBA MANUAL CON 3 PESTAÑAS (LISTA DE VERIFICACION)
+--------------------------------------------------
+Puedes usar 3 pestañas/ventanas del mismo navegador en localhost, o 3 laptops.
+
+1. Abre la pizarra en 3 pestañas y pulsa "Conectar" en todas.
+2. Pulsa "Camara" en las tres. Cada una debe ver su propia camara y la de las
+   otras dos (hasta 3 fichas remotas + la local).
+3. Habla en una: las otras dos deben oirla y ver el anillo verde en su ficha.
+4. Silencia el micro en una: las otras dos deben ver el icono de micro apagado
+   en esa ficha.
+5. Apaga la camara en una: las otras dos deben ver el avatar (inicial) en esa
+   ficha.
+6. Cierra una pestaña: su ficha debe desaparecer de las otras.
+7. Dibuja en el tablero en una pestaña: las otras deben seguir viendo los
+   trazos en tiempo real (la videollamada no debe romper el tablero).
+
+
+9. PROBLEMAS COMUNES
+--------------------------------------------------
+- "La videollamada necesita HTTPS o localhost": estas en http://IP:3005.
+  Aplica la seccion 4.
+- El navegador no pide permiso o no pasa nada: revisa que la barra de
+  direcciones no haya bloqueado camara/micro para el sitio (icono de camara
+  tachada) y vuelve a pulsar "Camara".
+- "Permiso denegado": habilita camara y microfono en los ajustes del sitio.
+- "No se encontro camara": el equipo no tiene camara; la llamada continua solo
+  con audio si hay micro.
+- "No se pudo acceder... otro programa los esta usando": cierra Zoom, Meet,
+  OBS u otra app que este usando la camara.
+- Se ve pero no se oye (o al contrario): suele ser NAT simetrico; configura
+  TURN (seccion 5).
+- Se conectan solo algunos pares: algunas redes permiten salir pero no entrar;
+  TURN tambien lo resuelve.
+- La camara no arranca sola en Safari/iOS: la llamada siempre empieza tras
+  pulsar "Camara", que es un gesto del usuario; los videos usan playsinline.
+
+
+10. SEGURIDAD Y PRIVACIDAD
+--------------------------------------------------
+- El video y el audio no pasan por el servidor de la pizarra; van directos
+  entre navegadores (o por TURN si esta configurado).
+- El servidor solo ve metadatos de senalizacion y los avisos de estado
+  (nombre, color, micro/camara).
+- La pagina se sirve con la cabecera
+  Permissions-Policy: camera=(self), microphone=(self)
+  que permite usar camara/micro a la propia pagina, pero no a iframes de
+  terceros.
+- La videollamada usa la misma lista blanca de salas que el tablero; el
+  servidor no se une a la sala -av, solo reenvia.
+
+
+11. RESUMEN EN UNA FRASE
+--------------------------------------------------
+La videollamada conecta las camaras y microfonos directamente entre las
+laptops usando la senalizacion del servidor; solo necesita un contexto seguro
+(HTTPS o localhost) y, en redes con NAT simetrico, un servidor TURN.

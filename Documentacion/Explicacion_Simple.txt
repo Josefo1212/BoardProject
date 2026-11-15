@@ -268,8 +268,40 @@ se actualiza localmente mientras se hace y se comparte completo al soltar,
 sin reiniciar ni cortar la conexion.
 
 
-11. RESUMEN EN UNA FRASE
+11. VIDEOLLAMADA (CAMARA Y MICROFONO)
+--------------------------------------------------
+Ademas de dibujar, la pizarra permite verse y oirse. Cada persona pulsa
+el boton "Camara" y aparece un panel con su camara y la de los demas.
+
+La idea es como una llamada de video normal: el video y el audio viajan
+directo de una laptop a otra, sin pasar por el servidor. El servidor solo
+ayuda a que las laptops se encuentren (como quien presenta a dos
+personas y luego se aparta).
+
+Cosas importantes:
+
+- La llamada NUNCA empieza sola: hay que pulsar "Camara".
+- Funciona en http://localhost y en paginas https (como Render).
+- En la red WiFi, si abres http://IP_DEL_SERVIDOR:3005, el navegador no
+  deja usar la camara por seguridad. Hay formas de resolverlo (certificado
+  o un ajuste del navegador); se explican en Documentacion/Videollamada.txt.
+- Si la red es "dificil" (redes de oficina, VPN), a veces no se conecta
+  aunque se vea la camara. Se arregla con un servidor "TURN", que hace de
+  puente. Tambien se explica en Documentacion/Videollamada.txt.
+- El panel se puede arrastrar, minimizar (queda un circulito con tu
+  avatar) y cerrar con el boton rojo.
+- Cuando alguien habla, su ficha se rodea de un anillo verde. Si silencia
+  el micro o apaga la camara, los demas ven un icono.
+- Si el servidor se cae o pulsas "Desconectar", la videollamada se cierra,
+  pero la pizarra sigue funcionando en local.
+
+La pizarra y la videollamada son independientes: si la llamada falla, el
+tablero sigue funcionando con normalidad.
+
+
+12. RESUMEN EN UNA FRASE
 --------------------------------------------------
 El servidor es el cuaderno central de la pizarra: recibe lo que dibuja
 cada laptop, lo valida, lo guarda, lo comparte con las demas y conserva
-una copia para que nada se pierda.
+una copia para que nada se pierda. Y para verse y oirse, las laptops se
+conectan directo entre si mientras el servidor solo las presenta.

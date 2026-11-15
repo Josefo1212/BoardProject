@@ -1,5 +1,6 @@
     import { Board } from "./js/Board.js";
     import { Communication } from "./js/Communication.js";
+    import { MediaCall } from "./js/MediaCall.js";
     import { $$, els } from "./js/dom.js";
     import { state } from "./js/state.js";
     import {
@@ -36,6 +37,10 @@
       const baseCtx = board.baseContext;
       const liveCtx = board.overlayContext;
       const communication = new Communication({ iceServers: ICE_SERVERS });
+
+      // Videollamada entre pares. Se crea en `init()` y solo se une cuando el
+      // usuario pulsa "Cámara" (nunca de forma automática).
+      let mediaCall = null;
 
       const roundPoint = (value) => Number(value.toFixed(5));
 
@@ -172,6 +177,7 @@
         els.userAvatar.style.background = state.color;
         els.userAvatar.style.color = light ? "#2b2444" : "#ffffff";
         updateSizeUI();
+        mediaCall?.setIdentity({ name: state.userName.trim() || "Artista", color: state.color });
       }
 
       const setTool = (tool) => {
@@ -262,6 +268,7 @@
         els.userAvatar.style.background = state.color;
         els.userAvatar.style.color = isLightColor(state.color) ? "#2b2444" : "#ffffff";
         document.title = `Pizarra · ${name}`;
+        mediaCall?.setIdentity({ name, color: state.color });
       }
 
       const layoutBoard = () => {
@@ -1792,6 +1799,8 @@
               if (generation !== state.socketGeneration) return;
               state.socket = null;
 
+              mediaCall?.leave({ silent: true });
+
               if (state.localActive) finishLocalStroke();
               state.active.clear();
               clearRemoteCursors();
@@ -1854,6 +1863,8 @@
         clearTimeout(state.reconnectTimer);
         state.reconnectTimer = null;
 
+        mediaCall?.leave({ silent: true });
+
         if (state.localActive) finishLocalStroke();
 
         communication.disconnect();
@@ -1878,6 +1889,40 @@
       const closeSizePopover = () => {
         els.sizePopover.classList.remove("is-open");
         els.sizeToggle.setAttribute("aria-expanded", "false");
+      }
+
+      const callRoom = () => {
+        try {
+          const url = new URL(normalizeServerUrl(SERVER_URL) || "");
+          return url.searchParams.get("room") || "pizarra";
+        } catch {
+          return "pizarra";
+        }
+      }
+
+      const updateCallButton = (info) => {
+        if (!els.callButton) return;
+        const active = Boolean(info?.active);
+        els.callButton.classList.toggle("is-active", active);
+        els.callButton.setAttribute("aria-pressed", active ? "true" : "false");
+        els.callButton.setAttribute("aria-label", active ? "Colgar la videollamada" : "Iniciar videollamada");
+        els.callButton.title = active ? "Colgar videollamada" : "Videollamada (cámara)";
+      }
+
+      const toggleCall = () => {
+        if (!mediaCall) return;
+
+        if (mediaCall.active) {
+          mediaCall.leave();
+          return;
+        }
+
+        if (!connected()) {
+          showToast("warning", "Conéctate al servidor para iniciar la videollamada.", { duration: 3600 });
+          return;
+        }
+
+        mediaCall.join();
       }
 
       const init = () => {
@@ -2091,6 +2136,19 @@
 
         window.addEventListener("resize", scheduleLayout);
         window.addEventListener("orientationchange", scheduleLayout);
+
+        mediaCall = new MediaCall({
+          serverUrl: () => normalizeServerUrl(SERVER_URL),
+          room: callRoom(),
+          iceServers: ICE_SERVERS,
+          onNotice: (type, message) => showToast(type, message, { duration: 4200 }),
+          onChange: updateCallButton,
+          announce: (message) => {
+            if (els.srLive) els.srLive.textContent = message;
+          },
+        });
+        mediaCall.setIdentity({ name: state.userName.trim() || "Artista", color: state.color });
+        els.callButton.addEventListener("click", toggleCall);
 
         setStatus("disconnected", "Desconectado");
         updateArtUI();

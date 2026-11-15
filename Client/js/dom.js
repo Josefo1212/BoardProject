@@ -25,6 +25,7 @@ export const els = {
   userCount: $("#user-count"),
   userName: $("#user-name"),
   userAvatar: $("#user-avatar"),
+  callButton: $("#call-button"),
   themeToggle: $("#theme-toggle"),
   helpButton: $("#help-button"),
   toolButtons: $$(".tool-btn"),

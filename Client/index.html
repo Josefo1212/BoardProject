@@ -130,6 +130,39 @@
         <path d="M9.5 14.5 7 17a3.5 3.5 0 0 1-5-5l2.5-2.5" />
         <path d="M14.5 9.5 17 7a3.5 3.5 0 1 1 5 5l-2.5 2.5" />
       </symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24">
+        <rect x="9" y="2.5" width="6" height="11" rx="3" />
+        <path d="M5.5 11a6.5 6.5 0 0 0 13 0" />
+        <path d="M12 17.5V21" />
+        <path d="M9 21h6" />
+      </symbol>
+      <symbol id="i-mic-off" viewBox="0 0 24 24">
+        <path d="M15 6v-.5a3 3 0 0 0-6 0V12" />
+        <path d="M9 11v1a3 3 0 0 0 4.6 2.5" />
+        <path d="M5.5 11a6.5 6.5 0 0 0 10.2 5.2" />
+        <path d="M18.5 11a6.5 6.5 0 0 1-.3 1.9" />
+        <path d="M12 17.5V21M9 21h6" />
+        <path d="m3.5 3.5 17 17" />
+      </symbol>
+      <symbol id="i-video" viewBox="0 0 24 24">
+        <rect x="2.5" y="6" width="12.5" height="12" rx="3" />
+        <path d="m15 10.5 5.5-3.2a.8.8 0 0 1 1.2.7v8a.8.8 0 0 1-1.2.7L15 13.5" />
+      </symbol>
+      <symbol id="i-video-off" viewBox="0 0 24 24">
+        <path d="M10.5 6H7a3 3 0 0 0-3 3v6a3 3 0 0 0 3 3h5a3 3 0 0 0 3-3v-1.2" />
+        <path d="m15 10.5 5.5-3.2a.8.8 0 0 1 1.2.7v8a.8.8 0 0 1-1.2.7L17 14.8" />
+        <path d="m3.5 3.5 17 17" />
+      </symbol>
+      <symbol id="i-phone-off" viewBox="0 0 24 24">
+        <path d="m3.5 3.5 17 17" />
+        <path d="M5.6 4.6h2.8l1.6 4.1-2 1.5a12.4 12.4 0 0 0 6 6l1.5-2 4.1 1.6v2.8a2 2 0 0 1-2.2 2A17 17 0 0 1 3.6 6.8a2 2 0 0 1 2-2.2Z" />
+      </symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24">
+        <path d="M4 7h9M17 7h3" />
+        <path d="M4 17h3M11 17h9" />
+        <circle cx="15" cy="7" r="2.2" />
+        <circle cx="9" cy="17" r="2.2" />
+      </symbol>
     </defs>
   </svg>
 
@@ -194,6 +227,9 @@
           <span class="avatar" id="user-avatar" aria-hidden="true">A</span>
           <input id="user-name" type="text" maxlength="20" value="Artista" placeholder="Tu nombre" autocomplete="nickname" aria-label="Tu nombre" />
         </label>
+        <button id="call-button" class="icon-btn call-top-btn" type="button" aria-label="Iniciar videollamada" title="Videollamada (cámara)" aria-pressed="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-video" /></svg>
+        </button>
         <button id="theme-toggle" class="icon-btn" type="button" aria-label="Cambiar a modo oscuro" title="Cambiar tema">
           <svg class="icon icon-sun" aria-hidden="true"><use href="#i-sun" /></svg>
           <svg class="icon icon-moon" aria-hidden="true"><use href="#i-moon" /></svg>
@@ -379,6 +415,7 @@
         <div class="shortcut"><span>Ayuda</span><kbd>?</kbd></div>
         <div class="shortcut"><span>Cerrar</span><kbd>Esc</kbd></div>
       </div>
+      <p>Conéctate y pulsa el botón de cámara (arriba) para iniciar una videollamada con las demás personas.</p>
     </div>
     <div class="modal-actions">
       <form method="dialog" class="modal-form">

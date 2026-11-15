@@ -5,6 +5,13 @@ server:
   pingIntervalMs: 30000
   maxPayloadBytes: 262144
   maxBufferedBytes: 8388608
+  # TLS opcional. Actívalo para servir HTTPS/WSS (necesario para que
+  # getUserMedia funcione en http://IP:3005). Las rutas son relativas a Server/.
+  # En Render el proxy ya termina TLS: déjalo desactivado.
+  tls:
+    enabled: true
+    cert: "certs/cert.pem"
+    key: "certs/key.pem"
 
 access:
   # "open" deja entrar a cualquier equipo de la misma red WiFi.
@@ -31,6 +38,7 @@ persistence:
 
 peer:
   room: "pizarra"
+  # La sala de videollamada se deriva como "pizarra-av" automáticamente.
   # auto intenta DataChannel y deja WebSocket como fallback.
   transport: "auto"
   iceServers:
