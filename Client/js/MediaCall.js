@@ -101,6 +101,7 @@ export class MediaCall extends EventTarget {
   #speakTimer = 0;
 
   #devices = { cameras: [], mics: [] };
+  #soundHintShown = false;
 
   constructor({
     serverUrl,
@@ -166,6 +167,7 @@ export class MediaCall extends EventTarget {
 
     this.#stream = stream;
     this.#active = true;
+    this.#soundHintShown = false;
 
     this.#buildDom();
     this.#showPanel();
@@ -464,9 +466,64 @@ export class MediaCall extends EventTarget {
 
   #attachRemoteVideo(peer) {
     if (!peer?.videoEl || !peer.stream) return;
-    if (peer.videoEl.srcObject !== peer.stream) peer.videoEl.srcObject = peer.stream;
-    const playback = peer.videoEl.play?.();
-    playback?.catch?.(() => {});
+    const video = peer.videoEl;
+    if (video.srcObject !== peer.stream) video.srcObject = peer.stream;
+    this.#playRemote(peer);
+  }
+
+  async #playRemote(peer) {
+    const video = peer.videoEl;
+    if (!video) return;
+
+    if (!peer.audioBlocked) {
+      try {
+        await video.play();
+        return;
+      } catch {
+        // Autoplay con audio bloqueado (típico en Android Chrome / Opera):
+        // mostramos el vídeo silenciado y el usuario activa el sonido a mano.
+        peer.audioBlocked = true;
+        video.muted = true;
+        this.#updateSoundButton(peer);
+        if (!this.#soundHintShown) {
+          this.#soundHintShown = true;
+          this.#notice("info", "Toca el altavoz de la ficha para activar el sonido.");
+        }
+      }
+    }
+
+    try {
+      await video.play();
+    } catch {}
+  }
+
+  async #toggleRemoteSound(peer) {
+    const video = peer.videoEl;
+    if (!video) return;
+
+    if (video.muted) {
+      video.muted = false;
+      try {
+        await video.play();
+      } catch {
+        video.muted = true;
+      }
+    } else {
+      video.muted = true;
+    }
+
+    peer.audioBlocked = video.muted;
+    this.#updateSoundButton(peer);
+  }
+
+  #updateSoundButton(peer) {
+    const button = peer.soundEl;
+    if (!button) return;
+    const muted = !!peer.audioBlocked || !!peer.videoEl?.muted;
+    button.classList.toggle("is-muted", muted);
+    const label = muted ? "Activar sonido" : "Silenciar sonido";
+    button.setAttribute("aria-label", label);
+    button.title = label;
   }
 
   #onRemoteState(detail) {
@@ -502,6 +559,8 @@ export class MediaCall extends EventTarget {
       cam: metadata?.cam !== false,
       stream: null,
       videoEl: null,
+      soundEl: null,
+      audioBlocked: false,
       speaking: false,
     };
 
@@ -954,11 +1013,24 @@ export class MediaCall extends EventTarget {
     const name = createElement("span", "call-name");
     const mic = createElement("span", "call-mic", { "aria-hidden": "true" });
     mic.appendChild(icon("i-mic-off"));
-    tile.append(video, avatar, name, mic);
+    const sound = createElement("button", "call-sound", {
+      id: `call-sound-${peer.id}`,
+      type: "button",
+      "aria-label": "Activar sonido",
+      title: "Activar sonido",
+    });
+    sound.appendChild(icon("i-volume", "icon icon-on"));
+    sound.appendChild(icon("i-volume-off", "icon icon-off"));
+    sound.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.#toggleRemoteSound(peer);
+    });
+    tile.append(video, avatar, name, mic, sound);
     peer.videoEl = video;
     peer.avatarEl = avatar;
     peer.nameEl = name;
     peer.micEl = mic;
+    peer.soundEl = sound;
     return tile;
   }
 

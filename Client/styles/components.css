@@ -316,6 +316,48 @@
   transform: scale(1);
 }
 
+.call-sound {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, #17122f 76%, transparent);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 0.2s var(--ease), transform 0.24s var(--spring);
+}
+
+.call-sound.is-muted {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.call-sound .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.call-sound .icon-off {
+  display: none;
+}
+
+.call-sound.is-muted .icon-on {
+  display: none;
+}
+
+.call-sound.is-muted .icon-off {
+  display: block;
+}
+
 .call-local {
   position: relative;
   align-self: flex-end;
