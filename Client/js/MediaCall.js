@@ -417,24 +417,56 @@ export class MediaCall extends EventTarget {
   }
 
   #onRemoteStream(detail) {
-    const { id, stream, metadata } = detail || {};
+    const { id, stream, metadata, peer: connection } = detail || {};
     if (!id || !stream) return;
     if (metadata?.peerId && metadata.peerId === this.#selfId) return;
 
-    let peer = this.#peers.get(id);
+    // El id del stream puede cambiar (reconexión, cambio de dispositivo).
+    // Reutilizamos la ficha por peerId para no dejar tarjetas sin vídeo.
+    const stableId = metadata?.peerId || id;
+    let peer = this.#peers.get(id) || this.#peers.get(stableId);
 
     if (!peer) {
       peer = this.#createPeer(id, metadata);
       this.#peers.set(id, peer);
+    } else if (peer.id !== id) {
+      this.#peers.delete(peer.id);
+      peer.id = id;
+      this.#peers.set(id, peer);
     }
 
     peer.stream = stream;
-    if (peer.videoEl) peer.videoEl.srcObject = stream;
     this.#applyMetadata(peer, metadata);
-    this.#attachAnalyser(stream, id);
     this.#updateTile(peer);
     this.#renderTiles();
+    this.#attachRemoteVideo(peer);
+
+    // El vendor sólo emite el primer evento `track` de cada conexión. Si el
+    // audio llega antes que el vídeo (o en otro MediaStream), recogemos el
+    // resto de pistas aquí para que la ficha termine mostrando la cámara.
+    if (connection && peer.trackedConnection !== connection) {
+      peer.trackedConnection = connection;
+      connection.addEventListener("track", (event) => {
+        const current = peer.stream || new MediaStream();
+        const tracks = [...(event.streams?.[0]?.getTracks?.() ?? []), event.track].filter(Boolean);
+        for (const track of tracks) {
+          if (!current.getTracks().includes(track)) current.addTrack(track);
+        }
+        peer.stream = current;
+        this.#updateTile(peer);
+        this.#attachRemoteVideo(peer);
+      });
+    }
+
+    this.#attachAnalyser(stream, id);
     this.#announceCall(`${peer.name} se unió a la videollamada.`);
+  }
+
+  #attachRemoteVideo(peer) {
+    if (!peer?.videoEl || !peer.stream) return;
+    if (peer.videoEl.srcObject !== peer.stream) peer.videoEl.srcObject = peer.stream;
+    const playback = peer.videoEl.play?.();
+    playback?.catch?.(() => {});
   }
 
   #onRemoteState(detail) {
