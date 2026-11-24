@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Pizarra colaborativa: clientes, señalización y WebRTC",
+    "output": "pizarra-arquitectura.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "participants", "type": "external", "label": "Participantes", "sublabel": "Laptop · móvil", "pos": [40, 330], "size": [130, 64] },
+    { "id": "clientApp", "type": "frontend", "label": "Cliente web", "sublabel": "app.js · Board · MediaCall", "pos": [230, 330], "size": [170, 72] },
+    { "id": "iceConfig", "type": "frontend", "label": "loadIceServers()", "sublabel": "Client/js/config.js", "pos": [230, 110], "size": [170, 64] },
+    { "id": "renderHost", "type": "cloud", "label": "Render", "sublabel": "HTTPS + WSS :443", "pos": [470, 330], "size": [140, 64] },
+    { "id": "metered", "type": "external", "label": "Metered Relay", "sublabel": "Credential API · STUN/TURN", "pos": [470, 110], "size": [170, 64] },
+    { "id": "staticHandler", "type": "backend", "label": "Archivos estáticos", "sublabel": "Client/ por HTTPS", "pos": [690, 110], "size": [160, 64] },
+    { "id": "boardSignal", "type": "backend", "label": "Señalización tablero", "sublabel": "WSS /board", "pos": [690, 270], "size": [170, 64] },
+    { "id": "avSignal", "type": "backend", "label": "Señalización AV", "sublabel": "WSS /signal", "pos": [690, 430], "size": [170, 64] },
+    { "id": "p2pMesh", "type": "messagebus", "label": "Malla WebRTC", "sublabel": "DataChannel + MediaStream", "pos": [930, 330], "size": [180, 72] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Render: despliegue único", "wraps": ["renderHost", "staticHandler", "boardSignal", "avSignal"] }
+  ],
+  "connections": [
+    { "id": "open-app", "from": "participants", "to": "clientApp", "label": "abre la pizarra", "variant": "emphasis", "labelDy": -26 },
+    { "id": "client-to-render", "from": "clientApp", "to": "renderHost", "label": "HTTPS + WSS" },
+    { "id": "config-fetch", "from": "iceConfig", "to": "metered", "label": "GET /turn/credentials", "variant": "dashed", "labelAt": [435, 188] },
+    { "id": "render-static", "from": "renderHost", "to": "staticHandler", "label": "sirve Client/" },
+    { "id": "render-board", "from": "renderHost", "to": "boardSignal", "label": "upgrade /board", "labelDx": -60 },
+    { "id": "render-av", "from": "renderHost", "to": "avSignal", "label": "upgrade /signal" },
+    { "id": "board-peers", "from": "boardSignal", "to": "p2pMesh", "label": "anuncio de peers", "labelAt": [825, 416] },
+    { "id": "av-peers", "from": "avSignal", "to": "p2pMesh", "label": "SDP + candidatos ICE", "labelAt": [895, 520] },
+    { "id": "turn-relay", "from": "metered", "to": "p2pMesh", "label": "relay si falla P2P", "variant": "dashed", "fromSide": "top", "toSide": "top", "via": [[555, 60], [1020, 60]] },
+    { "id": "media-back", "from": "p2pMesh", "to": "clientApp", "label": "trazos + cámara/mic", "fromSide": "bottom", "toSide": "bottom", "via": [[1020, 560], [315, 560]], "labelAt": [665, 545] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Carga", "items": ["Render entrega la app y mantiene la señalización", "config.js renueva credenciales TURN al arrancar"] },
+    { "dot": "emerald", "title": "Tablero", "items": ["Trazos por DataChannel P2P", "WebSocket de respaldo si WebRTC no está disponible"] },
+    { "dot": "violet", "title": "Videollamada", "items": ["Sala propia <sala>-av para SDP e ICE", "Micro silenciado al iniciar; altavoz por ficha de vídeo"] },
+    { "dot": "amber", "title": "Red", "items": ["STUN descubre la IP pública", "TURN reenvía vídeo tras NAT simétrico o datos móviles"] }
+  ]
+}
