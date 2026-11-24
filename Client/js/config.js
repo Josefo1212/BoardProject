@@ -43,16 +43,10 @@ export const SERVER_URL = configuredServer || (host ? `${wsProtocol}//${host}` :
 export const SERVER_URL_HINT =
   "Abre la página desde la laptop del servidor (http://IP_DEL_SERVIDOR:3005) o agrega ?server=ws://IP_DEL_SERVIDOR:3005 a la URL.";
 
-// Servidores ICE para WebRTC.
-//
-// STUN descubre la IP pública; TURN reenvía el vídeo cuando el P2P directo
-// falla (NAT simétrico, datos móviles, VPN...). Usamos el TURN gratuito de
-// Metered Open Relay. Las credenciales se renuevan al arrancar con
-// loadIceServers(); debajo queda una copia estática como respaldo.
 const METERED_TURN_URL = "https://pizarra.metered.live/api/v1/turn/credentials";
 const METERED_TURN_API_KEY = "39ad1d604a088f20f0d8ae675aecd624629a";
 
-export const TURN_SERVERS = [
+const TURN_SERVERS = [
   { urls: "turn:global.relay.metered.ca:80", username: "7d2a705e0dd61740debf9aa6", credential: "vdHB01ZJrfou6YEO" },
   { urls: "turn:global.relay.metered.ca:80?transport=tcp", username: "7d2a705e0dd61740debf9aa6", credential: "vdHB01ZJrfou6YEO" },
   { urls: "turn:global.relay.metered.ca:443", username: "7d2a705e0dd61740debf9aa6", credential: "vdHB01ZJrfou6YEO" },
@@ -81,7 +75,7 @@ function withUrlTurn(servers) {
   return [...servers, ...readTurnParam(params.get("turn")?.trim())];
 }
 
-export const ICE_SERVERS = withUrlTurn([...BASE_ICE_SERVERS, ...TURN_SERVERS]);
+const ICE_SERVERS = withUrlTurn([...BASE_ICE_SERVERS, ...TURN_SERVERS]);
 
 export async function loadIceServers() {
   try {
