@@ -8,16 +8,7 @@ const DEFAULT_MAX_MESSAGES_PER_SECOND = 2_000;
 const NAMESPACE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const NAMESPACE_ROOM = /^[A-Za-z0-9_-]{1,64}$/;
 
-/**
- * Convierte una sala (o lista de salas) permitidas en un Set.
- *
- * - null/undefined  -> null, que significa "cualquier sala válida" (compat).
- * - texto           -> Set con esa única sala.
- * - array/Set       -> Set con las salas no vacías indicadas.
- *
- * Un array vacío produce un Set vacío: no se permite ninguna sala.
- */
-export function toRoomSet(rooms) {
+export const toRoomSet = (rooms) => {
   if (rooms === null || rooms === undefined) {
     return null;
   }
@@ -30,26 +21,11 @@ export function toRoomSet(rooms) {
   return new Set(list.filter((room) => typeof room === "string" && room !== ""));
 }
 
-function isRoomAllowed(namespaceRoom, allowedRooms) {
+const isRoomAllowed = (namespaceRoom, allowedRooms) => {
   return allowedRooms === null || allowedRooms.has(namespaceRoom);
 }
 
-/**
- * Valida un namespace de señalización de la librería `p2p`.
- *
- * La librería usa dos formatos:
- *   ['sender', sala]          -> anuncio general
- *   ['sender', sala, id]      -> mensaje dirigido a un peer concreto
- *   ['receiver', sala]
- *   ['receiver', sala, id]
- *
- * `rooms` puede ser una sala, una lista de salas o un Set. Solo se aceptan
- * las salas de esa lista (evita salas arbitrarias). Si es null se acepta
- * cualquier sala con formato válido.
- *
- * Devuelve el namespace normalizado o null si no es válido.
- */
-export function normalizeNamespace(namespace, rooms = null) {
+export const normalizeNamespace = (namespace, rooms = null) => {
   if (!Array.isArray(namespace) || namespace.length < 2 || namespace.length > 3) {
     return null;
   }
@@ -75,12 +51,12 @@ export function normalizeNamespace(namespace, rooms = null) {
   return id === undefined ? [kind, namespaceRoom] : [kind, namespaceRoom, id];
 }
 
-export function namespaceKey(namespace, rooms = null) {
+export const namespaceKey = (namespace, rooms = null) => {
   const normalized = normalizeNamespace(namespace, rooms);
   return normalized ? normalized.join(":") : null;
 }
 
-function sendJson(socket, payload) {
+const sendJson = (socket, payload) => {
   if (socket.readyState !== 1) {
     return false;
   }
@@ -93,7 +69,7 @@ function sendJson(socket, payload) {
   }
 }
 
-function normalizeIp(ip) {
+const normalizeIp = (ip) => {
   if (typeof ip !== "string") {
     return "";
   }
@@ -101,13 +77,6 @@ function normalizeIp(ip) {
   return ip.replace(/^::ffff:/, "").replace(/^\[|\]$/g, "");
 }
 
-/**
- * Broker de señalización en memoria.
- *
- * Actúa como driver de la librería `p2p` en el servidor (suscripciones
- * locales) y, a la vez, enruta los mensajes de los navegadores que llegan
- * por WebSocket (suscripciones remotas).
- */
 export class SignalingHub {
   #room;
   #rooms;
@@ -309,12 +278,6 @@ export class SignalingHub {
   }
 }
 
-/**
- * Servidor WebSocket de señalización montado en `/signal`.
- *
- * No escucha por su cuenta: se engancha al servidor HTTP mediante
- * `handleUpgrade`, igual que el WebSocket del tablero en `/board`.
- */
 export class SignalingServer {
   #server;
   #hub;

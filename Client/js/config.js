@@ -7,27 +7,10 @@ const isHttpPage = pageProtocol === "http:" || pageProtocol === "https:";
 const localHosts = new Set(["", "localhost", "127.0.0.1", "::1", "[::1]"]);
 const isLocalPage = localHosts.has(pageHost.toLowerCase());
 
-// IP o nombre de la laptop que ejecuta el servidor WebSocket.
-//
-// Déjalo vacío ("") para detección automática. Es lo recomendado:
-// - Si la página la sirve el propio servidor (http://IP_DEL_SERVIDOR:3005),
-//   el cliente usa ese mismo host y funciona en cualquier red.
-// - Si la página se sirve desde otra máquina (por ejemplo Live Server en
-//   http://IP_DEL_SERVIDOR:5500), el cliente usa esa IP con el puerto 3005.
-//
-// Solo rellénalo si cada laptop abre su propio Live Server en 127.0.0.1
-// y necesitas apuntar manualmente a la laptop del servidor, por ejemplo:
-//   export const SERVER_HOST = "192.168.1.125";
-//
-// También puedes sobreescribirlo sin tocar código:
-//   http://127.0.0.1:5500/?server=ws://IP_DEL_SERVIDOR:3005
 export const SERVER_HOST = "";
 
 const wsProtocol = pageProtocol === "https:" ? "wss:" : "ws:";
 
-// Detección automática del servidor:
-// - Servido por el propio servidor (mismo host y puerto, incluido Render).
-// - Servido desde otra máquina de la red: apunta al puerto 3005 del host.
 const autoHost = (() => {
   if (!isHttpPage) return "";
   if (pagePort === "3005" || pagePort === "") return window.location.host;
@@ -53,7 +36,7 @@ const TURN_SERVERS = [
   { urls: "turns:global.relay.metered.ca:443?transport=tcp", username: "7d2a705e0dd61740debf9aa6", credential: "vdHB01ZJrfou6YEO" },
 ];
 
-function readTurnParam(value) {
+const readTurnParam = (value) => {
   if (!value) return [];
 
   try {
@@ -71,13 +54,13 @@ function readTurnParam(value) {
 
 const BASE_ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
 
-function withUrlTurn(servers) {
+const withUrlTurn = (servers) => {
   return [...servers, ...readTurnParam(params.get("turn")?.trim())];
 }
 
 const ICE_SERVERS = withUrlTurn([...BASE_ICE_SERVERS, ...TURN_SERVERS]);
 
-export async function loadIceServers() {
+export const loadIceServers = async () => {
   try {
     const response = await fetch(METERED_TURN_URL + "?apiKey=" + encodeURIComponent(METERED_TURN_API_KEY));
     if (!response.ok) throw new Error("HTTP " + response.status);

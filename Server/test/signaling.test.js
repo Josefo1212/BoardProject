@@ -13,7 +13,7 @@ import {
 
 const ACCESS = { mode: "open", allowedOrigins: ["*"], allowedIps: ["127.0.0.1", "::1"] };
 
-async function startServer({ rooms = ["pizarra", "pizarra-av"], room = "pizarra" } = {}) {
+const startServer = async ({ rooms = ["pizarra", "pizarra-av"], room = "pizarra" } = {}) => {
   const hub = new SignalingHub({ room, rooms });
   const signaling = new SignalingServer({ hub, access: ACCESS, room, rooms });
   const server = http.createServer((_request, response) => {
@@ -50,7 +50,7 @@ async function startServer({ rooms = ["pizarra", "pizarra-av"], room = "pizarra"
   };
 }
 
-function connect(port) {
+const connect = (port) => {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://127.0.0.1:${port}/signal`);
     const messages = [];

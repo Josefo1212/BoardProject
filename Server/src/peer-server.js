@@ -7,7 +7,7 @@ import { PeerSocket } from "./peer-socket.js";
  * rellena `RTCPeerConnection`, `RTCSessionDescription` y `RTCIceCandidate`
  * antes de que `p2p` cree ninguna conexión.
  */
-export async function loadP2P() {
+export const loadP2P = async () => {
   const polyfillModule = await import("node-datachannel/polyfill");
   const polyfill = polyfillModule.default || polyfillModule;
 
@@ -20,11 +20,6 @@ export async function loadP2P() {
   return { Sender };
 }
 
-/**
- * Lado servidor de la topología P2P: el servidor es el `Sender` y cada
- * navegador es un `Receiver`. Por cada DataChannel abierto se registra un
- * `PeerSocket` en `Communication`, que sigue siendo la autoridad del tablero.
- */
 export class PeerServer {
   #sender;
   #communication;

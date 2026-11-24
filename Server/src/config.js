@@ -42,7 +42,7 @@ const DEFAULTS = {
 const DEFAULT_ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
 const ROOM_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
-function readIceServers(value) {
+const readIceServers = (value) => {
   if (value === undefined || value === null || value === "") {
     return [...DEFAULT_ICE_SERVERS];
   }
@@ -73,11 +73,11 @@ function readIceServers(value) {
   return servers.length > 0 ? servers : [...DEFAULT_ICE_SERVERS];
 }
 
-function isPlainObject(value) {
+const isPlainObject = (value) => {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function readString(value, fallback, name, { allowEmpty = false } = {}) {
+const readString = (value, fallback, name, { allowEmpty = false } = {}) => {
   if (value === undefined) {
     return fallback;
   }
@@ -89,7 +89,7 @@ function readString(value, fallback, name, { allowEmpty = false } = {}) {
   return value.trim();
 }
 
-function readNumber(value, fallback, name, { min, max, integer = false }) {
+const readNumber = (value, fallback, name, { min, max, integer = false }) => {
   if (value === undefined) {
     return fallback;
   }
@@ -109,7 +109,7 @@ function readNumber(value, fallback, name, { min, max, integer = false }) {
   return value;
 }
 
-function readStringList(value, fallback, name) {
+const readStringList = (value, fallback, name) => {
   if (value === undefined) {
     return [...fallback];
   }
@@ -126,12 +126,7 @@ function readStringList(value, fallback, name) {
   return items.length > 0 ? items : [...fallback];
 }
 
-/**
- * Lee una ruta opcional (por ejemplo un certificado TLS). Las rutas relativas
- * se resuelven contra `rootDir` para que la configuración sea portable.
- * Devuelve null si no se indica nada.
- */
-function readOptionalPath(value, rootDir) {
+const readOptionalPath = (value, rootDir) => {
   if (value === undefined || value === null) {
     return null;
   }
@@ -144,7 +139,7 @@ function readOptionalPath(value, rootDir) {
   return path.isAbsolute(trimmed) ? trimmed : path.resolve(rootDir, trimmed);
 }
 
-export function loadConfig(configPath, rootDir) {
+export const loadConfig = (configPath, rootDir) => {
   let raw;
 
   try {

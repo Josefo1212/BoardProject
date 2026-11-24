@@ -7,7 +7,7 @@ import path from "node:path";
 import { WebSocket } from "ws";
 import { Communication } from "../src/communication.js";
 
-function makeConfig(overrides = {}) {
+const makeConfig = (overrides = {}) => {
   return {
     server: {
       host: "127.0.0.1",
@@ -40,14 +40,14 @@ function makeConfig(overrides = {}) {
   };
 }
 
-async function startServer(overrides) {
+const startServer = async (overrides) => {
   const communication = new Communication(makeConfig(overrides));
   await once(communication.server, "listening");
   const { port } = communication.server.address();
   return { communication, port };
 }
 
-function connect(port) {
+const connect = (port) => {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://127.0.0.1:${port}`);
     const messages = [];

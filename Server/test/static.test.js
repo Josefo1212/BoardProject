@@ -14,14 +14,14 @@ const clientDir = path.join(
   "Client",
 );
 
-async function startServer() {
+const startServer = async () => {
   const server = http.createServer(createStaticHandler(clientDir));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   return { server, port: server.address().port };
 }
 
-async function stopServer(server) {
+const stopServer = async (server) => {
   await new Promise((resolve) => {
     server.close(() => resolve());
     server.closeAllConnections?.();

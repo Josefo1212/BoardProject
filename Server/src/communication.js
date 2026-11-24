@@ -53,12 +53,6 @@ export class Communication {
     this.#maxMessagesPerSecond = limits.maxMessagesPerSecond;
     this.#persistence = persistence;
 
-    // Sin memoria persistida entre sesiones
-    // this.#loadPersistedBoard();
-
-    // Si el llamador ya creó un servidor HTTP (para servir también el
-    // cliente), el WebSocket se engancha a él en lugar de abrir su propio
-    // puerto. Así un único puerto expone la página y el WebSocket.
     const serverOptions = {
       maxPayload: this.#maxPayloadBytes,
       clientTracking: false,
@@ -100,10 +94,6 @@ export class Communication {
     return this.#strokes.size;
   }
 
-  /**
-   * Enruta un upgrade HTTP hacia el WebSocket del tablero. Se usa cuando
-   * varios WebSocketServer comparten el mismo servidor HTTP (`noServer`).
-   */
   handleUpgrade(request, socket, head) {
     this.#server.handleUpgrade(request, socket, head, (ws) => {
       this.#server.emit("connection", ws, request);
@@ -126,13 +116,6 @@ export class Communication {
       clearTimeout(this.#persistTimer);
       this.#persistTimer = null;
     }
-
-    // No guardar en disco
-    // try {
-    //   await this.#flushPersistence();
-    // } catch (error) {
-    //   console.error("[Board] No se pudo guardar la pizarra al cerrar:", error.message);
-    // }
 
     for (const client of this.#clients) {
       this.#sendJson(client.socket, {
@@ -162,11 +145,6 @@ export class Communication {
     });
   }
 
-  /**
-   * Conecta un peer P2P al tablero. Registra su `PeerSocket` como un cliente
-   * más de `Communication`, compartiendo la misma lógica de validación,
-   * snapshot, broadcast y límites que un cliente WebSocket normal.
-   */
   attachPeer(socket, { peerId = null, remoteIp = "p2p", origin = null } = {}) {
     if (this.#closed) {
       socket.close(CLOSE_GOING_AWAY, "Servidor apagado");
@@ -341,10 +319,6 @@ export class Communication {
         this.#broadcast(result.broadcast, client.socket);
       }
 
-      // No guardar en disco
-      // if (result.persist) {
-      //   this.#schedulePersist();
-      // }
     } catch (error) {
       const code = error instanceof ProtocolError ? error.code : "INVALID_MESSAGE";
       const errorMessage = error instanceof Error ? error.message : "Mensaje inválido.";

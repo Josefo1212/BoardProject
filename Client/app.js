@@ -38,8 +38,6 @@
       const liveCtx = board.overlayContext;
       let communication = null;
 
-      // Videollamada entre pares. Se crea en `init()` y solo se une cuando el
-      // usuario pulsa "Cámara" (nunca de forma automática).
       let mediaCall = null;
 
       const roundPoint = (value) => Number(value.toFixed(5));

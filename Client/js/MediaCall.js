@@ -2,8 +2,6 @@ import { Receiver, Sender } from "./vendor/p2p.esm.js";
 import { SignalingDriver } from "./P2PCommunication.js";
 import { clamp, isLightColor, normalizeHex } from "./utils.js";
 
-// La videollamada vive en una sala propia ("<sala>-av") para no mezclarse con
-// el DataChannel del tablero. El servidor solo reenvía la señalización.
 const CALL_ROOM_SUFFIX = "-av";
 
 const SPEAK_THRESHOLD = 0.045;
@@ -32,7 +30,7 @@ const CAMERA_MISSING_ERRORS = new Set([
   "ConstraintNotSatisfiedError",
 ]);
 
-function randomId() {
+const randomId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
@@ -40,7 +38,7 @@ function randomId() {
   return `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function createElement(tag, className, attributes = {}) {
+const createElement = (tag, className, attributes = {}) => {
   const node = document.createElement(tag);
   if (className) node.className = className;
   for (const [key, value] of Object.entries(attributes)) {
@@ -49,7 +47,7 @@ function createElement(tag, className, attributes = {}) {
   return node;
 }
 
-function icon(symbol, className = "icon") {
+const icon = (symbol, className = "icon") => {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", className);
   svg.setAttribute("aria-hidden", "true");
@@ -59,16 +57,6 @@ function icon(symbol, className = "icon") {
   return svg;
 }
 
-/**
- * Videollamada entre pares (mesh) sobre la señalización del servidor.
- *
- * Cada cliente publica su cámara/micrófono con un `Sender` y recibe a los
- * demás con un `Receiver`. El vídeo nunca pasa por el servidor: solo se
- * intercambian las ofertas/respuestas SDP y los candidatos ICE.
- *
- * Es un `EventTarget` por si se prefiere escuchar eventos, pero la integración
- * con la app usa las callbacks `onChange` / `onNotice` / `announce`.
- */
 export class MediaCall extends EventTarget {
   #getServerUrl;
   #room;

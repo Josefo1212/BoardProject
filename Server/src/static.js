@@ -21,12 +21,10 @@ const MIME_TYPES = {
 };
 
 const BASE_HEADERS = {
-  // Permite que la propia página use cámara y micrófono (videollamadas P2P).
-  // No se delega a iframes de terceros.
   "Permissions-Policy": "camera=(self), microphone=(self)",
 };
 
-function sendText(response, status, message, extraHeaders = {}) {
+const sendText = (response, status, message, extraHeaders = {}) => {
   response.writeHead(status, {
     "Content-Type": "text/plain; charset=utf-8",
     ...BASE_HEADERS,
@@ -35,15 +33,10 @@ function sendText(response, status, message, extraHeaders = {}) {
   response.end(message);
 }
 
-/**
- * Sirve los archivos estáticos del cliente (HTML, JS, CSS, fuentes...).
- * Se usa como handler del mismo servidor HTTP al que se engancha el
- * WebSocket, de modo que un solo comando expone la app completa.
- */
-export function createStaticHandler(rootDir) {
+export const createStaticHandler = (rootDir) => {
   const root = path.resolve(rootDir);
 
-  return async function handleRequest(request, response) {
+  return async (request, response) => {
     if (request.method !== "GET" && request.method !== "HEAD") {
       sendText(response, 405, "Método no permitido", { Allow: "GET, HEAD" });
       return;

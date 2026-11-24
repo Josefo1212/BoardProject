@@ -128,7 +128,7 @@ persistence:
 
 4.2 Módulo config.js
 
-export function loadConfig(configPath, rootDir)
+export const loadConfig = (configPath, rootDir) =>
 
 Responsabilidades:
 1. Leer el YAML con fs.readFileSync y yaml.load.

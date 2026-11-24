@@ -8,7 +8,7 @@ const REASSEMBLY_TIMEOUT_MS = 15_000;
 const OPEN = 1;
 const CLOSED = 3;
 
-function toText(data) {
+const toText = (data) => {
   if (typeof data === "string") {
     return data;
   }
@@ -24,13 +24,6 @@ function toText(data) {
   return String(data);
 }
 
-/**
- * Adaptador que hace que un RTCDataChannel se comporte como un socket `ws`.
- *
- * `Communication` solo necesita `readyState`, `bufferedAmount`, `send`,
- * `close`, `terminate`, `ping` y los eventos `message` / `close` / `error`.
- * Los mensajes grandes (por ejemplo el snapshot) se trocean en ambos sentidos.
- */
 export class PeerSocket extends EventEmitter {
   #channel;
   #peerId;

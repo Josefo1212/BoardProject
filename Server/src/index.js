@@ -16,10 +16,7 @@ const rootDir = path.join(__dirname, "..");
 const config = loadConfig(path.join(rootDir, "config.yaml"), rootDir);
 const clientDir = path.join(rootDir, "..", "Client");
 
-// TLS es opcional: si `server.tls.enabled` es true servimos HTTPS/WSS, lo que
-// además habilita `getUserMedia` en la red local (orígenes seguros). En Render
-// el proxy ya termina TLS, así que allí se deja desactivado.
-function createHttpServer() {
+const createHttpServer = () => {
   const handler = createStaticHandler(clientDir);
 
   if (!config.server.tls.enabled) {
@@ -68,7 +65,7 @@ httpServer.on("upgrade", (request, socket, head) => {
   socket.destroy();
 });
 
-function lanAddresses() {
+const lanAddresses = () => {
   const addresses = new Set();
 
   for (const interfaces of Object.values(os.networkInterfaces())) {
@@ -82,7 +79,7 @@ function lanAddresses() {
   return [...addresses];
 }
 
-function logListening() {
+const logListening = () => {
   const { host, port } = config.server;
   console.log(`Servidor WebSocket escuchando en ${wsProtocol}://${host}:${port}`);
   console.log(`Cliente web disponible en ${httpProtocol}://localhost:${port}`);
@@ -131,7 +128,7 @@ httpServer.listen(config.server.port, config.server.host, async () => {
   }
 });
 
-async function shutdown(signal) {
+const shutdown = async (signal) => {
   if (shuttingDown) {
     return;
   }
