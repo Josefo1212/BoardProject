@@ -45,23 +45,19 @@ export const SERVER_URL_HINT =
 
 // Servidores ICE para WebRTC.
 //
-// STUN es suficiente en la mayoría de redes domésticas, pero falla cuando el
-// NAT es simétrico (algunas redes corporativas, móviles o con VPN). En ese caso
-// los pares no pueden descubrirse y la videollamada no conecta. Rellena
-// TURN_SERVERS con un servidor TURN propio o de un proveedor para garantizarlo:
-//
-//   export const TURN_SERVERS = [
-//     {
-//       urls: "turn:turn.tu-dominio.com:3478",
-//       username: "usuario",
-//       credential: "clave",
-//     },
-//   ];
-//
-// También puedes pasarlo por la URL sin tocar código:
-//   ?turn=turn:host:3478|usuario|clave
-//   ?turn=[{"urls":"turn:host:3478","username":"u","credential":"c"}]
-export const TURN_SERVERS = [];
+// STUN descubre la IP pública; TURN reenvía el vídeo cuando el P2P directo
+// falla (NAT simétrico, datos móviles, VPN...). Usamos el TURN gratuito de
+// Metered Open Relay. Las credenciales se renuevan al arrancar con
+// loadIceServers(); debajo queda una copia estática como respaldo.
+const METERED_TURN_URL = "https://pizarra.metered.live/api/v1/turn/credentials";
+const METERED_TURN_API_KEY = "39ad1d604a088f20f0d8ae675aecd624629a";
+
+export const TURN_SERVERS = [
+  { urls: "turn:global.relay.metered.ca:80", username: "7d2a705e0dd61740debf9aa6", credential: "vdHB01ZJrfou6YEO" },
+  { urls: "turn:global.relay.metered.ca:80?transport=tcp", username: "7d2a705e0dd61740debf9aa6", credential: "vdHB01ZJrfou6YEO" },
+  { urls: "turn:global.relay.metered.ca:443", username: "7d2a705e0dd61740debf9aa6", credential: "vdHB01ZJrfou6YEO" },
+  { urls: "turns:global.relay.metered.ca:443?transport=tcp", username: "7d2a705e0dd61740debf9aa6", credential: "vdHB01ZJrfou6YEO" },
+];
 
 function readTurnParam(value) {
   if (!value) return [];
@@ -79,11 +75,28 @@ function readTurnParam(value) {
   return urls ? [{ urls, username: username || undefined, credential: credential || undefined }] : [];
 }
 
-export const ICE_SERVERS = [
-  { urls: "stun:stun.l.google.com:19302" },
-  ...TURN_SERVERS,
-  ...readTurnParam(params.get("turn")?.trim()),
-];
+const BASE_ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
+
+function withUrlTurn(servers) {
+  return [...servers, ...readTurnParam(params.get("turn")?.trim())];
+}
+
+export const ICE_SERVERS = withUrlTurn([...BASE_ICE_SERVERS, ...TURN_SERVERS]);
+
+export async function loadIceServers() {
+  try {
+    const response = await fetch(METERED_TURN_URL + "?apiKey=" + encodeURIComponent(METERED_TURN_API_KEY));
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const servers = await response.json();
+    if (!Array.isArray(servers) || !servers.some((server) => String(server?.urls || "").startsWith("turn"))) {
+      throw new Error("Respuesta TURN inválida");
+    }
+    return withUrlTurn([...BASE_ICE_SERVERS, ...servers]);
+  } catch (error) {
+    console.warn("[ICE] No se pudieron renovar las credenciales TURN; se usa la configuración estática.", error);
+    return ICE_SERVERS;
+  }
+}
 
 export const STORAGE = {
   name: "pizarra.name.v1",

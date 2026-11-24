@@ -5,7 +5,7 @@
     import { state } from "./js/state.js";
     import {
       CURSOR_THROTTLE_MS,
-      ICE_SERVERS,
+      loadIceServers,
       MAX_WIDTH,
       MIN_WIDTH,
       PALETTE,
@@ -36,7 +36,7 @@
       const board = new Board({ base: els.base, overlay: els.overlay });
       const baseCtx = board.baseContext;
       const liveCtx = board.overlayContext;
-      const communication = new Communication({ iceServers: ICE_SERVERS });
+      let communication = null;
 
       // Videollamada entre pares. Se crea en `init()` y solo se une cuando el
       // usuario pulsa "Cámara" (nunca de forma automática).
@@ -1925,9 +1925,12 @@
         mediaCall.join();
       }
 
-      const init = () => {
+      const init = async () => {
         if (state.initialized) return;
         state.initialized = true;
+
+        const iceServers = await loadIceServers();
+        communication = new Communication({ iceServers });
 
         document.addEventListener("submit", (e) => {
           const form = e.target;
@@ -2140,7 +2143,7 @@
         mediaCall = new MediaCall({
           serverUrl: () => normalizeServerUrl(SERVER_URL),
           room: callRoom(),
-          iceServers: ICE_SERVERS,
+          iceServers,
           onNotice: (type, message) => showToast(type, message, { duration: 4200 }),
           onChange: updateCallButton,
           announce: (message) => {
